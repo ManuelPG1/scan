@@ -36,6 +36,7 @@ h2, h3 {
 /* --- EL VISOR DEL ESCÁNER (Canvas) --- */
 #lienzoApp {
     max-width: 100%;
+    height: auto;
     /* Efecto de marco metálico grueso */
     border: 6px solid var(--laton-oscuro);
     border-radius: 4px;
