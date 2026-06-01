@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Escáner Aethelgard</title> <link rel="stylesheet" href="estilos.css">
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#241811">
+</head>
+<body>
+
+    <h2>Escáner Web</h2>
+
+    <input type="file" id="inputImagen" accept="image/*">
+
+    <canvas id="lienzoApp"></canvas>
+
+    <div class="controles">
+        <label style="margin-right: 15px; font-weight: bold;">
+            <input type="checkbox" id="checkBlancoNegro"> Blanco y Negro
+        </label>
+        <button id="btnEscanear">Recortar y Escanear</button>
+    </div>
+
+   <div class="gestion-documento" style="margin-top: 20px; padding: 15px; border-top: 2px dashed #ccc;">
+    <h3>Documento Actual: <span id="contadorPaginas">0</span> páginas</h3>
+    <div id="vistasPrevias" style="display: flex; gap: 10px; justify-content: center; margin-bottom: 15px; overflow-x: auto; padding: 10px;"></div>
+
+    <div style="margin-bottom: 15px;">
+        <label for="formatoPdf" style="font-weight: bold;">Formato del PDF final: </label>
+        <select id="formatoPdf">
+            <option value="a4">Tamaño Estándar A4 (Recomendado)</option>
+            <option value="dinamico">Tamaño Original Recortado</option>
+        </select>
+    </div>
+
+    <button id="btnGuardarPagina" disabled>Añadir Página Actual al PDF</button>
+    <button id="btnDescargarImagen" disabled>Descargar como Imagen</button>
+    <button id="btnDescargarPDF" disabled>Finalizar y Descargar PDF</button>
+    <button id="btnLimpiar" style="background-color: #ffdddd; color: #cc0000;">Borrar Todo</button>
+</div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script async src="https://docs.opencv.org/4.8.0/opencv.js" type="text/javascript"></script>
+    <script src="app.js"></script>
+</body>
+</html>
