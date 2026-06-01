@@ -1,7 +1,7 @@
 {
-  "name": "Escáner Aethelgard",
-  "short_name": "Aethelgard",
-  "description": "Escáner de documentos Steampunk libre de anuncios",
+  "name": "Escáner Aethel",
+  "short_name": "Aethel",
+  "description": "Escáner de documentos",
   "start_url": "./index.html",
   "display": "standalone",
   "background_color": "#241811",
