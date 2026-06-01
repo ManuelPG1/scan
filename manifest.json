@@ -2,7 +2,7 @@
   "name": "Escáner Aethel",
   "short_name": "Aethel",
   "description": "Escáner de documentos",
-  "start_url": "./index.html",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#241811",
   "theme_color": "#c5a059",
