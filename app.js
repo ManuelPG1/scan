@@ -18,7 +18,7 @@ const ctx = canvas.getContext('2d');
 let img = new Image();
 let puntos = []; // Guardará las 4 esquinas: [{x,y}, {x,y}, {x,y}, {x,y}]
 let puntoArrastrado = null; // Índice del punto que estamos moviendo
-const radioPunto = 20; // Tamaño del área táctil para agarrar el punto
+const radioPunto = 35; // Tamaño del área táctil para agarrar el punto
 
 // 1. Cargar la imagen cuando el usuario la selecciona
 inputImagen.addEventListener('change', (e) => {
@@ -106,14 +106,14 @@ function iniciarArrastre(e) {
     e.preventDefault(); // Evita que la pantalla haga scroll al tocar el canvas
     const pos = obtenerCoordenadas(e);
 
-    // Comprobamos si el usuario ha tocado cerca de algún punto (usando Pitágoras)
+    const zonaDeteccion = radioPunto * 4;
+
     for (let i = 0; i < puntos.length; i++) {
         const dx = pos.x - puntos[i].x;
         const dy = pos.y - puntos[i].y;
         const distancia = Math.sqrt(dx * dx + dy * dy);
 
-        // Damos un margen generoso (radioPunto * 3) para que sea fácil acertar con el dedo gordo
-        if (distancia < radioPunto * 3) {
+        if (distancia < zonaDeteccion) {
             puntoArrastrado = i;
             break;
         }
@@ -210,14 +210,33 @@ btnEscanear.addEventListener('click', () => {
     // cv.filter2D(src, dst, ddepth, kernel, anchor, delta, borderType)
     cv.filter2D(imgProcesada, imgProcesada, cv.CV_8U, matrizKernel, new cv.Point(-1, -1), 0, cv.BORDER_DEFAULT);
 
-    // 5. Opcional: Blanco y Negro
+    // 5. Opcional: Blanco y Negro (Escáner Mejorado)
     if (checkBlancoNegro.checked) {
-        // Pasamos a escala de grises
+        // Paso 1: Escala de grises pura
         cv.cvtColor(imgProcesada, imgProcesada, cv.COLOR_RGBA2GRAY, 0);
 
-        // Usamos Threshold Adaptativo: es mejor que el simple porque calcula
-        // las sombras locales del papel y deja el fondo blanco puro.
-        cv.adaptiveThreshold(imgProcesada, imgProcesada, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 11, 2);
+        // Paso 2: Suavizar el ruido del sensor de la cámara o la textura del papel
+        // El tamaño (5,5) es el kernel. Cuanto más grande, más difumina el ruido antes de umbralizar.
+        let ksize = new cv.Size(5, 5);
+        cv.GaussianBlur(imgProcesada, imgProcesada, ksize, 0, 0, cv.BORDER_DEFAULT);
+
+        // Paso 3: Aumentar el contraste extremo (blancos más blancos) antes del umbral
+        // Alpha (1.5) es el contraste. Beta (20) es el brillo extra.
+        imgProcesada.convertTo(imgProcesada, -1, 1.5, 20);
+
+        // Paso 4: Umbral Adaptativo Calibrado
+        // Parámetro 11: Tamaño del bloque (vecindario de píxeles analizados)
+        // Parámetro 15 (La clave): Es la constante que restamos a la media.
+        // Antes tenías un "2". Al subirlo a "15", le decimos que ignore los ruidos ligeros y solo convierta a negro lo que sea MUCHO más oscuro que su entorno (el texto real).
+        cv.adaptiveThreshold(
+            imgProcesada,
+            imgProcesada,
+            255,
+            cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+            cv.THRESH_BINARY,
+            11,
+            15 // <-- ESTA ES LA CONSTANTE MÁGICA ANTIMANCHAS
+        );
     }
 
     // 6. Mostrar el resultado final
@@ -435,4 +454,50 @@ btnLimpiar.addEventListener('click', () => {
         btnDescargarImagen.disabled = true;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
+});
+
+const btnRotar = document.getElementById('btnRotar');
+
+btnRotar.addEventListener('click', () => {
+    // Si no hay ninguna imagen cargada, no hacemos nada
+    if (!img.src) return;
+
+    // 1. Creamos un canvas temporal en la memoria
+    const canvasTemp = document.createElement('canvas');
+    const ctxTemp = canvasTemp.getContext('2d');
+
+    // 2. Intercambiamos ancho y alto para alojar el giro de 90º
+    canvasTemp.width = img.height;
+    canvasTemp.height = img.width;
+
+    // 3. Movemos el "eje de rotación" al centro exacto del nuevo canvas
+    ctxTemp.translate(canvasTemp.width / 2, canvasTemp.height / 2);
+    // Giramos 90 grados (en radianes)
+    ctxTemp.rotate(90 * Math.PI / 180);
+
+    // 4. Dibujamos la imagen original anclada a ese nuevo centro
+    ctxTemp.drawImage(img, -img.width / 2, -img.height / 2);
+
+    // 5. Sustituimos la imagen actual por la nueva versión rotada
+    img.onload = () => {
+        // Adaptamos nuestro lienzo principal a la nueva orientación
+        canvas.width = img.width;
+        canvas.height = img.height;
+
+        // Volvemos a colocar los 4 puntos de recorte con el margen del 10%
+        const margenX = img.width * 0.1;
+        const margenY = img.height * 0.1;
+
+        puntos = [
+            { x: margenX, y: margenY },
+            { x: img.width - margenX, y: margenY },
+            { x: img.width - margenX, y: img.height - margenY },
+            { x: margenX, y: img.height - margenY }
+        ];
+
+        dibujarEscena();
+    };
+
+    // Extraemos los píxeles del canvas temporal y disparamos el onload
+    img.src = canvasTemp.toDataURL('image/jpeg', 1.0);
 });
