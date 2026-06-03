@@ -10,6 +10,7 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+let colaArchivos = [];
 
 const inputImagen = document.getElementById('inputImagen');
 const canvas = document.getElementById('lienzoApp');
@@ -22,33 +23,48 @@ const radioPunto = 35; // Tamaño del área táctil para agarrar el punto
 
 // 1. Cargar la imagen cuando el usuario la selecciona
 inputImagen.addEventListener('change', (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    // Convertimos los archivos seleccionados en un array y los añadimos a la cola
+    const archivosNuevos = Array.from(e.target.files);
+    if (archivosNuevos.length === 0) return;
+
+    colaArchivos = colaArchivos.concat(archivosNuevos);
+
+    // Vaciamos el input para que vuelva a funcionar si hacemos fotos repetidas (El bug de la cámara)
+    e.target.value = '';
+
+    // Si es la primera imagen que cargamos, iniciamos el proceso
+    cargarSiguienteArchivo();
+});
+
+// Función para ir procesando la cola uno a uno
+function cargarSiguienteArchivo() {
+    if (colaArchivos.length === 0) {
+        alert("¡Todas las imágenes de la cola han sido procesadas!");
+        return;
+    }
+
+    // Sacamos el primer archivo de la lista
+    const archivoActual = colaArchivos.shift();
 
     const reader = new FileReader();
     reader.onload = (event) => {
         img.onload = () => {
-            // Ajustamos el tamaño interno del canvas al de la imagen
             canvas.width = img.width;
             canvas.height = img.height;
-
-            // Inicializamos los 4 puntos (dejamos un margen del 10% de los bordes)
             const margenX = img.width * 0.1;
             const margenY = img.height * 0.1;
-
             puntos = [
-                { x: margenX, y: margenY },                                 // Sup-Izq
-                { x: img.width - margenX, y: margenY },                     // Sup-Der
-                { x: img.width - margenX, y: img.height - margenY },        // Inf-Der
-                { x: margenX, y: img.height - margenY }                     // Inf-Izq
+                { x: margenX, y: margenY },
+                { x: img.width - margenX, y: margenY },
+                { x: img.width - margenX, y: img.height - margenY },
+                { x: margenX, y: img.height - margenY }
             ];
-
             dibujarEscena();
         };
         img.src = event.target.result;
     };
-    reader.readAsDataURL(file);
-});
+    reader.readAsDataURL(archivoActual);
+}
 
 // 2. Función principal para dibujar la imagen y los puntos
 
@@ -67,9 +83,11 @@ function dibujarEscena() {
     }
     ctx.closePath();
     ctx.lineWidth = 4;
-    ctx.strokeStyle = '#b85d19'; // Color cobre
+   // ctx.strokeStyle = '#b85d19'; // Color cobre
+    ctx.strokeStyle = '#3b82f6'; // Azul eléctrico de la paleta
     ctx.stroke();
-    ctx.fillStyle = 'rgba(184, 93, 25, 0.2)';
+    //ctx.fillStyle = 'rgba(184, 93, 25, 0.2)';
+    ctx.fillStyle = 'rgba(59, 130, 246, 0.15)'; // Mismo azul, semitransparente
     ctx.fill();
 
     // Dibujamos los 4 puntos (manejadores)
@@ -79,7 +97,8 @@ function dibujarEscena() {
         ctx.fillStyle = '#ffffff';
         ctx.fill();
         ctx.lineWidth = 3;
-        ctx.strokeStyle = '#b85d19'; // Color cobre
+       // ctx.strokeStyle = '#b85d19'; // Color cobre
+        ctx.strokeStyle = '#3b82f6'; // Borde azul
         ctx.stroke();
     });
 }
@@ -148,8 +167,8 @@ canvas.addEventListener('touchend', terminarArrastre);
 const btnEscanear = document.getElementById('btnEscanear');
 const checkBlancoNegro = document.getElementById('checkBlancoNegro');
 const btnGuardarPagina = document.getElementById('btnGuardarPagina');
-const btnDescargarImagen = document.getElementById('btnDescargarImagen');
-const btnDescargarPDF = document.getElementById('btnDescargarPDF');
+const btnCompartirImagen = document.getElementById('btnCompartirImagen');
+const btnCompartirPDF = document.getElementById('btnCompartirPDF');
 const btnLimpiar = document.getElementById('btnLimpiar');
 const contadorPaginas = document.getElementById('contadorPaginas');
 const vistasPrevias = document.getElementById('vistasPrevias');
@@ -341,6 +360,10 @@ btnGuardarPagina.addEventListener('click', () => {
     contadorPaginas.textContent = listaPaginas.length;
     btnDescargarPDF.disabled = false;
     btnGuardarPagina.disabled = true; // Bloquear hasta el siguiente escaneo
+
+    if (colaArchivos.length > 0) {
+        cargarSiguienteArchivo();
+    }
 });
 
 // --- LÓGICA DE SOLTAR (DROP) EN EL CONTENEDOR PRINCIPAL ---
@@ -375,18 +398,48 @@ function obtenerElementoSiguiente(contenedor, x) {
         }
     }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
+/////////////////////
+function base64ToBlob(base64, mimeType) {
+    const byteString = atob(base64.split(',')[1]);
+    const ab = new ArrayBuffer(byteString.length);
+    const ia = new Uint8Array(ab);
+    for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+    }
+    return new Blob([ab], { type: mimeType });
+}
 
 // 2. Descargar únicamente la imagen que se ve actualmente en pantalla
-btnDescargarImagen.addEventListener('click', () => {
+btnCompartirImagen.addEventListener('click', async () => {
     if (!imagenActualBase64) return;
-    const enlace = document.createElement('a');
-    enlace.download = `escaneo_${Date.now()}.jpg`;
-    enlace.href = imagenActualBase64;
-    enlace.click();
+
+    const blob = base64ToBlob(imagenActualBase64, 'image/jpeg');
+    const archivo = new File([blob], `escaner_${Date.now()}.jpg`, { type: 'image/jpeg' });
+
+    // Comprobamos si el móvil soporta compartir archivos directamente
+    if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+        try {
+            await navigator.share({
+                files: [archivo],
+                title: 'Imagen Escaneada',
+                text: 'Aquí tienes la imagen escaneada.'
+            });
+        } catch (error) {
+            console.log('El usuario canceló o hubo un error al compartir', error);
+        }
+    } else {
+        // Fallback para PC: Forzamos descarga normal si no hay menú de compartir
+        const url = URL.createObjectURL(blob);
+        const enlace = document.createElement('a');
+        enlace.href = url;
+        enlace.download = archivo.name;
+        enlace.click();
+        URL.revokeObjectURL(url);
+    }
 });
 
 // 3. Compilar todas las páginas acumuladas en un único archivo PDF alternando tamaños
-btnDescargarPDF.addEventListener('click', () => {
+btnCompartirPDF.addEventListener('click', async () => {
     if (listaPaginas.length === 0) return;
 
     const { jsPDF } = window.jspdf;
@@ -439,7 +492,28 @@ btnDescargarPDF.addEventListener('click', () => {
         }
     });
 
-    doc.save(`documento_escaneado_${Date.now()}.pdf`);
+    const pdfBlob = doc.output('blob');
+    const archivo = new File([pdfBlob], `documento_${Date.now()}.pdf`, { type: 'application/pdf' });
+
+    if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+        try {
+            await navigator.share({
+                files: [archivo],
+                title: 'Documento Escaneado',
+                text: 'PDF generado desde Aethelgard.'
+            });
+        } catch (error) {
+            console.log('Error al compartir PDF', error);
+        }
+    } else {
+        // Fallback para PC
+        const url = URL.createObjectURL(pdfBlob);
+        const enlace = document.createElement('a');
+        enlace.href = url;
+        enlace.download = archivo.name;
+        enlace.click();
+        URL.revokeObjectURL(url);
+    }
 });
 
 // 4. Reiniciar el estado por completo
