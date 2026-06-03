@@ -1,19 +1,19 @@
 <!DOCTYPE html>
 <html lang="es">
 <head>
-<meta charset="UTF-8">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Escáner Aethelgard</title> <link rel="stylesheet" href="estilos.css">
+    <title>Scanner</title>
+    <link rel="stylesheet" href="estilos.css">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#241811">
+    <meta name="theme-color" content="#0f172a">
 </head>
 <body>
 
     <h2>Escáner Web</h2>
 
-    <input type="file" id="inputImagen" accept="image/*">
     <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-    <input type="file" id="inputImagen" accept="image/*">
+    <input type="file" id="inputImagen" accept="image/*" multiple>
     <button id="btnRotar" style="min-width: 60px; padding: 10px;">↻ 90º</button>
     </div>
 
@@ -38,9 +38,9 @@
         </select>
     </div>
 
-    <button id="btnGuardarPagina" disabled>Añadir Página Actual al PDF</button>
-    <button id="btnDescargarImagen" disabled>Descargar como Imagen</button>
-    <button id="btnDescargarPDF" disabled>Finalizar y Descargar PDF</button>
+    <button id="btnGuardarPagina" disabled>Añadir y Siguiente</button>
+    <button id="btnCompartirImagen" disabled>Compartir Imagen Actual 📤</button>
+    <button id="btnCompartirPDF" disabled>Crear y Compartir PDF 📤</button>
     <button id="btnLimpiar" style="background-color: #ffdddd; color: #cc0000;">Borrar Todo</button>
 </div>
 
