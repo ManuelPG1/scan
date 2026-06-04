@@ -20,11 +20,19 @@
     <canvas id="lienzoApp"></canvas>
 
     <div class="controles">
-        <label style="margin-right: 15px; font-weight: bold;">
-            <input type="checkbox" id="checkBlancoNegro"> Blanco y Negro
-        </label>
-        <button id="btnEscanear">Recortar y Escanear</button>
-    </div>
+            <label style="font-weight: bold; justify-content: center; margin-bottom: 10px;">
+                <input type="checkbox" id="checkBlancoNegro"> Blanco y Negro
+            </label>
+
+            <div id="controlesFiltro" style="display: none; width: 100%; margin-bottom: 15px;">
+                <label for="rangoSensibilidad" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; justify-content: center;">
+                    Sensibilidad (Izquierda: Lápiz | Derecha: Tinta oscura)
+                </label>
+                <input type="range" id="rangoSensibilidad" min="2" max="25" value="15" step="1" style="width: 100%; accent-color: var(--accent);">
+            </div>
+
+            <button id="btnEscanear">Recortar y Escanear</button>
+        </div>
 
    <div class="gestion-documento" style="margin-top: 20px; padding: 15px; border-top: 2px dashed #ccc;">
     <h3>Documento Actual: <span id="contadorPaginas">0</span> páginas</h3>
