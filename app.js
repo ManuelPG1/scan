@@ -173,6 +173,14 @@ const btnLimpiar = document.getElementById('btnLimpiar');
 const contadorPaginas = document.getElementById('contadorPaginas');
 const vistasPrevias = document.getElementById('vistasPrevias');
 
+const controlesFiltro = document.getElementById('controlesFiltro');
+const rangoSensibilidad = document.getElementById('rangoSensibilidad');
+
+// Mostrar u ocultar el slider cuando se marca "Blanco y Negro"
+checkBlancoNegro.addEventListener('change', (e) => {
+    controlesFiltro.style.display = e.target.checked ? 'block' : 'none';
+});
+
 // El almacén de nuestro documento multipágina
 let listaPaginas = [];
 let imagenActualBase64 = null;
@@ -230,7 +238,8 @@ btnEscanear.addEventListener('click', () => {
         // Al usar un bloque de 81 o superior, el filtro es capaz de "ver" fuera del código QR
         // y darse cuenta de que es una figura negra sobre papel blanco, no dejándolo hueco.
         let blockSize = 85; // DEBE ser un número impar.
-        let constante = 15; // Resta 15 para ignorar las sombras suaves del folio.
+        let constante = parseInt(rangoSensibilidad.value);
+
 
         cv.adaptiveThreshold(
             imgProcesada,
@@ -420,7 +429,7 @@ btnCompartirImagen.addEventListener('click', async () => {
     const archivo = new File([blob], `escaner_${Date.now()}.jpg`, { type: 'image/jpeg' });
 
     // Comprobamos si el móvil soporta compartir archivos directamente
-    if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+    if (navigator.share) {
         try {
             await navigator.share({
                 files: [archivo],
@@ -431,13 +440,20 @@ btnCompartirImagen.addEventListener('click', async () => {
             console.log('El usuario canceló o hubo un error al compartir', error);
         }
     } else {
-        // Fallback para PC: Forzamos descarga normal si no hay menú de compartir
+        // Fallback: Descarga segura compatible con PWA
         const url = URL.createObjectURL(blob);
         const enlace = document.createElement('a');
+        enlace.style.display = 'none'; // Lo ocultamos visualmente
         enlace.href = url;
         enlace.download = archivo.name;
+        document.body.appendChild(enlace); // CRUCIAL: Lo pegamos al HTML
         enlace.click();
-        URL.revokeObjectURL(url);
+
+        // Esperamos 100ms y lo borramos para no ensuciar la memoria
+        setTimeout(() => {
+            document.body.removeChild(enlace);
+            URL.revokeObjectURL(url);
+        }, 100);
     }
 });
 
@@ -498,7 +514,7 @@ btnCompartirPDF.addEventListener('click', async () => {
     const pdfBlob = doc.output('blob');
     const archivo = new File([pdfBlob], `documento_${Date.now()}.pdf`, { type: 'application/pdf' });
 
-    if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+    if (navigator.share) {
         try {
             await navigator.share({
                 files: [archivo],
@@ -509,13 +525,19 @@ btnCompartirPDF.addEventListener('click', async () => {
             console.log('Error al compartir PDF', error);
         }
     } else {
-        // Fallback para PC
+        // Fallback: Descarga segura compatible con PWA
         const url = URL.createObjectURL(pdfBlob);
         const enlace = document.createElement('a');
+        enlace.style.display = 'none';
         enlace.href = url;
         enlace.download = archivo.name;
+        document.body.appendChild(enlace); // CRUCIAL: Lo pegamos al HTML
         enlace.click();
-        URL.revokeObjectURL(url);
+
+        setTimeout(() => {
+            document.body.removeChild(enlace);
+            URL.revokeObjectURL(url);
+        }, 100);
     }
 });
 
