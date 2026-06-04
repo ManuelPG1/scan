@@ -214,50 +214,53 @@ btnEscanear.addEventListener('click', () => {
     cv.warpPerspective(src, imgRecortada, matrizTransformacion, new cv.Size(ancho, alto));
 
     // 4. APLICAR EFECTO ESCÁNER (Tu lógica de Python en JS)
+    // --- 4. NUEVA ARQUITECTURA DE PROCESAMIENTO VISUAL ---
     let imgProcesada = new cv.Mat();
 
-    // Aumentar contraste y brillo (Equivalente a cv2.convertScaleAbs)
-    // .convertTo(destino, tipo_dato, alpha, beta)
-    imgRecortada.convertTo(imgProcesada, -1, 1.2, 10);
-
-    // Filtro de enfoque (Sharpening kernel)
-    let matrizKernel = cv.matFromArray(3, 3, cv.CV_32F, [
-        -1, -1, -1,
-        -1,  9, -1,
-        -1, -1, -1
-    ]);
-    // cv.filter2D(src, dst, ddepth, kernel, anchor, delta, borderType)
-    cv.filter2D(imgProcesada, imgProcesada, cv.CV_8U, matrizKernel, new cv.Point(-1, -1), 0, cv.BORDER_DEFAULT);
-
-    // 5. Opcional: Blanco y Negro (Escáner Mejorado)
     if (checkBlancoNegro.checked) {
-        // Paso 1: Escala de grises pura
-        cv.cvtColor(imgProcesada, imgProcesada, cv.COLOR_RGBA2GRAY, 0);
+        // --- MODO DOCUMENTO PURO (BLANCO Y NEGRO) ---
 
-        // Paso 2: Suavizar el ruido del sensor de la cámara o la textura del papel
-        // El tamaño (5,5) es el kernel. Cuanto más grande, más difumina el ruido antes de umbralizar.
-        let ksize = new cv.Size(5, 5);
-        cv.GaussianBlur(imgProcesada, imgProcesada, ksize, 0, 0, cv.BORDER_DEFAULT);
+        // 1. Escala de grises
+        cv.cvtColor(imgRecortada, imgProcesada, cv.COLOR_RGBA2GRAY, 0);
 
-        // Paso 3: Aumentar el contraste extremo (blancos más blancos) antes del umbral
-        // Alpha (1.5) es el contraste. Beta (20) es el brillo extra.
-        imgProcesada.convertTo(imgProcesada, -1, 1.5, 20);
+        // 2. Desenfoque inicial ligero para planchar el ruido del sensor
+        cv.GaussianBlur(imgProcesada, imgProcesada, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
 
-        // Paso 4: Umbral Adaptativo Calibrado
-        // Parámetro 11: Tamaño del bloque (vecindario de píxeles analizados)
-        // Parámetro 15 (La clave): Es la constante que restamos a la media.
-        // Antes tenías un "2". Al subirlo a "15", le decimos que ignore los ruidos ligeros y solo convierta a negro lo que sea MUCHO más oscuro que su entorno (el texto real).
+        // 3. Umbral Adaptativo de Bloque Gigante
+        // Al usar un bloque de 81 o superior, el filtro es capaz de "ver" fuera del código QR
+        // y darse cuenta de que es una figura negra sobre papel blanco, no dejándolo hueco.
+        let blockSize = 85; // DEBE ser un número impar.
+        let constante = 15; // Resta 15 para ignorar las sombras suaves del folio.
+
         cv.adaptiveThreshold(
             imgProcesada,
             imgProcesada,
             255,
             cv.ADAPTIVE_THRESH_GAUSSIAN_C,
             cv.THRESH_BINARY,
-            11,
-            15 // <-- ESTA ES LA CONSTANTE MÁGICA ANTIMANCHAS
+            blockSize,
+            constante
         );
-    }
 
+    } else {
+        // --- MODO FOTOGRAFÍA / REVISTA (COLOR) ---
+
+        let imgDesenfocada = new cv.Mat();
+
+        // 1. Aumento sutil de contraste y brillo para quitar el tono grisáceo
+        imgRecortada.convertTo(imgProcesada, -1, 1.1, 15);
+
+        // 2. Creamos una copia desenfocada de la imagen original
+        cv.GaussianBlur(imgProcesada, imgDesenfocada, new cv.Size(0, 0), 3, 3, cv.BORDER_DEFAULT);
+
+        // 3. Unsharp Masking (Máscara de Desenfoque)
+        // Al restar la copia borrosa a la original, logramos que solo los bordes nítidos
+        // (letras, dibujos) destaquen, ignorando el ruido del fondo.
+        // Fórmula: (Original * 1.5) + (Borrosa * -0.5) + 0
+        cv.addWeighted(imgProcesada, 1.5, imgDesenfocada, -0.5, 0, imgProcesada);
+
+        imgDesenfocada.delete(); // Limpieza de memoria temporal
+    }
     // 6. Mostrar el resultado final
     canvas.width = ancho;
     canvas.height = alto;
@@ -269,7 +272,7 @@ btnEscanear.addEventListener('click', () => {
 
     // Activamos los botones de acción inmediata
     btnGuardarPagina.disabled = false;
-    btnDescargarImagen.disabled = false;
+    btnCompartirImagen.disabled = false;
 
     puntos = [];
 
@@ -335,7 +338,7 @@ btnGuardarPagina.addEventListener('click', () => {
 
             // Actualizamos la interfaz
             contadorPaginas.textContent = listaPaginas.length;
-            if (listaPaginas.length === 0) btnDescargarPDF.disabled = true;
+            if (listaPaginas.length === 0) btnCompartirPDF.disabled = true;
         }
     });
 
@@ -358,7 +361,7 @@ btnGuardarPagina.addEventListener('click', () => {
 
     // Actualizamos interfaz general
     contadorPaginas.textContent = listaPaginas.length;
-    btnDescargarPDF.disabled = false;
+    btnCompartirPDF.disabled = false;
     btnGuardarPagina.disabled = true; // Bloquear hasta el siguiente escaneo
 
     if (colaArchivos.length > 0) {
@@ -523,9 +526,9 @@ btnLimpiar.addEventListener('click', () => {
         imagenActualBase64 = null;
         contadorPaginas.textContent = "0";
         vistasPrevias.innerHTML = "";
-        btnDescargarPDF.disabled = true;
+        btnCompartirPDF.disabled = true;
         btnGuardarPagina.disabled = true;
-        btnDescargarImagen.disabled = true;
+        btnCompartirImagen.disabled = true;
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
 });
