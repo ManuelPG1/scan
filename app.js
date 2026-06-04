@@ -429,7 +429,7 @@ btnCompartirImagen.addEventListener('click', async () => {
     const archivo = new File([blob], `escaner_${Date.now()}.jpg`, { type: 'image/jpeg' });
 
     // Comprobamos si el móvil soporta compartir archivos directamente
-    if (navigator.share) {
+if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
         try {
             await navigator.share({
                 files: [archivo],
