@@ -3,55 +3,68 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Scanner</title>
+    <title>Scanner Pro</title>
     <link rel="stylesheet" href="estilos.css">
     <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#0f172a">
+    <meta name="theme-color" content="#121212">
 </head>
 <body>
 
-    <h2>Escáner Web</h2>
+    <header class="app-header">
+        <h2>// LAB. ESCÁNER</h2>
+        <div class="indicador-estado">SISTEMA EN LÍNEA</div>
+    </header>
 
-    <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-    <input type="file" id="inputImagen" accept="image/*" multiple>
-    <button id="btnRotar" style="min-width: 60px; padding: 10px;">↻ 90º</button>
+    <div class="top-controls">
+        <input type="file" id="inputImagen" accept="image/*" multiple>
+        <button id="btnRotar" class="btn-icon">[ 90º ]</button>
     </div>
 
-    <canvas id="lienzoApp"></canvas>
+    <div class="visor-container">
+        <canvas id="lienzoApp"></canvas>
+    </div>
 
-    <div class="controles">
-            <label style="font-weight: bold; justify-content: center; margin-bottom: 10px;">
-                <input type="checkbox" id="checkBlancoNegro"> Blanco y Negro
-            </label>
+    <div id="panelRecorte" class="panel-control">
+        <p class="instruccion-tecnica">ESTABLECER ÁREA DE ESCANEO (4 PUNTOS)</p>
+        <button id="btnEscanear" class="btn-primary">INICIAR RECORTE</button>
+    </div>
 
-            <div id="controlesFiltro" style="display: none; width: 100%; margin-bottom: 15px;">
-                <label for="rangoSensibilidad" style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 5px; justify-content: center;">
-                    Sensibilidad (Izquierda: Lápiz | Derecha: Tinta oscura)
-                </label>
-                <input type="range" id="rangoSensibilidad" min="2" max="25" value="15" step="1" style="width: 100%; accent-color: var(--accent);">
-            </div>
+    <div id="panelFiltros" class="panel-control" style="display: none;">
+        <label class="toggle-tecnico">
+            <input type="checkbox" id="checkBlancoNegro">
+            <span>MODO DOCUMENTO (B/N)</span>
+        </label>
 
-            <button id="btnEscanear">Recortar y Escanear</button>
+        <div id="controlesFiltro" class="parametro-control" style="display: none;">
+            <label for="rangoSensibilidad">UMBRAL DE SENSIBILIDAD [GRAFITO <-> TINTA]</label>
+            <input type="range" id="rangoSensibilidad" min="2" max="25" value="15" step="1">
         </div>
 
-   <div class="gestion-documento" style="margin-top: 20px; padding: 15px; border-top: 2px dashed #ccc;">
-    <h3>Documento Actual: <span id="contadorPaginas">0</span> páginas</h3>
-    <div id="vistasPrevias" style="display: flex; gap: 10px; justify-content: center; margin-bottom: 15px; overflow-x: auto; padding: 10px;"></div>
-
-    <div style="margin-bottom: 15px;">
-        <label for="formatoPdf" style="font-weight: bold;">Formato del PDF final: </label>
-        <select id="formatoPdf">
-            <option value="a4">Tamaño Estándar A4 (Recomendado)</option>
-            <option value="dinamico">Tamaño Original Recortado</option>
-        </select>
+        <div class="btn-group">
+            <button id="btnVolver" class="btn-secondary">< RECALIBRAR</button>
+            <button id="btnConfirmar" class="btn-primary">CONFIRMAR PROCESO ></button>
+        </div>
     </div>
 
-    <button id="btnGuardarPagina" disabled>Añadir y Siguiente</button>
-    <button id="btnCompartirImagen" disabled>Compartir Imagen Actual 📤</button>
-    <button id="btnCompartirPDF" disabled>Crear y Compartir PDF 📤</button>
-    <button id="btnLimpiar" style="background-color: #ffdddd; color: #cc0000;">Borrar Todo</button>
-</div>
-<a href="https://www.flaticon.es/iconos-gratis/escaner-3d" title="escaner-3d iconos">Escaner-3d iconos creados por Muhammad_Usman - Flaticon</a>
+   <div class="panel-control gestion-documento">
+        <h3 class="titulo-seccion">LOTE DE SALIDA: <span id="contadorPaginas" class="contador-tech">0</span> PÁGS</h3>
+
+        <div id="vistasPrevias" class="galeria-lote"></div>
+
+        <div class="parametro-control">
+            <label for="formatoPdf">FORMATO DE COMPILACIÓN:</label>
+            <select id="formatoPdf" class="input-tecnico">
+                <option value="a4">ESTÁNDAR A4 (ISO 216)</option>
+                <option value="dinamico">DIMENSIONES RELATIVAS</option>
+            </select>
+        </div>
+
+        <button id="btnGuardarPagina" style="display: none;">Añadir y Siguiente</button>
+        <button id="btnCompartirImagen" class="btn-action" disabled>EXPORTAR IMAGEN (JPG)</button>
+        <button id="btnCompartirPDF" class="btn-primary" disabled>COMPILAR Y EXPORTAR (PDF)</button>
+        <button id="btnLimpiar" class="btn-danger">PURGAR MEMORIA</button>
+    </div>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script async src="https://docs.opencv.org/4.8.0/opencv.js" type="text/javascript"></script>
     <script src="app.js"></script>
