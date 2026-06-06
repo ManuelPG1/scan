@@ -411,6 +411,8 @@ function obtenerElementoSiguiente(contenedor, x) {
     }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 /////////////////////
+// --- FUNCIONES DE UTILIDAD PARA COMPARTIR Y DESCARGAR ---
+
 function base64ToBlob(base64, mimeType) {
     const byteString = atob(base64.split(',')[1]);
     const ab = new ArrayBuffer(byteString.length);
@@ -421,124 +423,121 @@ function base64ToBlob(base64, mimeType) {
     return new Blob([ab], { type: mimeType });
 }
 
-// 2. Descargar únicamente la imagen que se ve actualmente en pantalla
+// NUEVO: Función a prueba de fallos para forzar la descarga en el móvil
+function forzarDescarga(blob, nombreArchivo) {
+    const url = URL.createObjectURL(blob);
+    const enlace = document.createElement('a');
+    enlace.style.display = 'none';
+    enlace.href = url;
+    enlace.download = nombreArchivo;
+    document.body.appendChild(enlace);
+    enlace.click();
+    setTimeout(() => {
+        document.body.removeChild(enlace);
+        URL.revokeObjectURL(url);
+    }, 100);
+}
+
+// 2. Descargar o Compartir IMAGEN
 btnCompartirImagen.addEventListener('click', async () => {
     if (!imagenActualBase64) return;
 
     const blob = base64ToBlob(imagenActualBase64, 'image/jpeg');
-    const archivo = new File([blob], `escaner_${Date.now()}.jpg`, { type: 'image/jpeg' });
+    const nombreArchivo = `escaner_${Date.now()}.jpg`;
+    const archivo = new File([blob], nombreArchivo, { type: 'image/jpeg' });
 
-    // Comprobamos si el móvil soporta compartir archivos directamente
-if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+    if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
         try {
             await navigator.share({
                 files: [archivo],
-                title: 'Imagen Escaneada',
-                text: 'Aquí tienes la imagen escaneada.'
+                title: 'Imagen Escaneada'
             });
         } catch (error) {
-            console.log('El usuario canceló o hubo un error al compartir', error);
+            // Si falla por seguridad (o no es AbortError de cancelar a mano), forzamos descarga
+            if (error.name !== 'AbortError') {
+                forzarDescarga(blob, nombreArchivo);
+            }
         }
     } else {
-        // Fallback: Descarga segura compatible con PWA
-        const url = URL.createObjectURL(blob);
-        const enlace = document.createElement('a');
-        enlace.style.display = 'none'; // Lo ocultamos visualmente
-        enlace.href = url;
-        enlace.download = archivo.name;
-        document.body.appendChild(enlace); // CRUCIAL: Lo pegamos al HTML
-        enlace.click();
-
-        // Esperamos 100ms y lo borramos para no ensuciar la memoria
-        setTimeout(() => {
-            document.body.removeChild(enlace);
-            URL.revokeObjectURL(url);
-        }, 100);
+        // Fallback directo para PC o móviles no compatibles
+        forzarDescarga(blob, nombreArchivo);
     }
 });
 
-// 3. Compilar todas las páginas acumuladas en un único archivo PDF alternando tamaños
+// 3. Compilar y Compartir PDF
 btnCompartirPDF.addEventListener('click', async () => {
     if (listaPaginas.length === 0) return;
 
-    const { jsPDF } = window.jspdf;
-    const formato = document.getElementById('formatoPdf').value;
+    // Cambiamos el texto del botón visualmente para que el usuario sepa que está cargando
+    const textoOriginal = btnCompartirPDF.innerHTML;
+    btnCompartirPDF.innerHTML = "Generando PDF... ⏳";
+    btnCompartirPDF.disabled = true;
 
-    // Inicializamos el documento. Si es A4 usamos milímetros (mm), si es dinámico usamos píxeles (px).
-    const doc = new jsPDF({
-        orientation: 'p',
-        unit: formato === 'a4' ? 'mm' : 'px',
-        hotfixes: ["px_scaling"]
-    });
+    // Le damos un pequeño respiro de 50ms al navegador para que actualice el texto del botón
+    // antes de bloquearse procesando el PDF
+    setTimeout(async () => {
+        const { jsPDF } = window.jspdf;
+        const formato = document.getElementById('formatoPdf').value;
 
-    listaPaginas.forEach((pagina, indice) => {
-        // Borramos la página 1 por defecto en la primera iteración
-        if (indice === 0) doc.deletePage(1);
+        const doc = new jsPDF({
+            orientation: 'p',
+            unit: formato === 'a4' ? 'mm' : 'px',
+            hotfixes: ["px_scaling"]
+        });
 
-        if (formato === 'a4') {
-            // --- LÓGICA PARA TAMAÑO A4 ESTÁNDAR ---
-            doc.addPage('a4', 'p');
+        listaPaginas.forEach((pagina, indice) => {
+            if (indice === 0) doc.deletePage(1);
 
-            // Dimensiones de un folio A4 en milímetros
-            const anchoA4 = 210;
-            const altoA4 = 297;
+            if (formato === 'a4') {
+                doc.addPage('a4', 'p');
+                const anchoA4 = 210;
+                const altoA4 = 297;
+                const ratioImagen = pagina.ancho / pagina.alto;
+                const ratioA4 = anchoA4 / altoA4;
+                let anchoFinal = anchoA4;
+                let altoFinal = altoA4;
+                let x = 0, y = 0;
 
-            // Calculamos proporciones para no deformar la fotografía
-            const ratioImagen = pagina.ancho / pagina.alto;
-            const ratioA4 = anchoA4 / altoA4;
-
-            let anchoFinal = anchoA4;
-            let altoFinal = altoA4;
-            let x = 0;
-            let y = 0;
-
-            if (ratioImagen > ratioA4) {
-                // La imagen es más ancha que el A4 en proporción (ej: apaisada)
-                altoFinal = anchoA4 / ratioImagen;
-                y = (altoA4 - altoFinal) / 2; // La centramos verticalmente
+                if (ratioImagen > ratioA4) {
+                    altoFinal = anchoA4 / ratioImagen;
+                    y = (altoA4 - altoFinal) / 2;
+                } else {
+                    anchoFinal = altoA4 * ratioImagen;
+                    x = (anchoA4 - anchoFinal) / 2;
+                }
+                doc.addImage(pagina.datos, 'JPEG', x, y, anchoFinal, altoFinal);
             } else {
-                // La imagen es más estrecha/alta que el A4
-                anchoFinal = altoA4 * ratioImagen;
-                x = (anchoA4 - anchoFinal) / 2; // La centramos horizontalmente
+                doc.addPage([pagina.ancho, pagina.alto], pagina.ancho > pagina.alto ? 'l' : 'p');
+                doc.addImage(pagina.datos, 'JPEG', 0, 0, pagina.ancho, pagina.alto);
             }
+        });
 
-            doc.addImage(pagina.datos, 'JPEG', x, y, anchoFinal, altoFinal);
+        const pdfBlob = doc.output('blob');
+        const nombreDoc = `documento_${Date.now()}.pdf`;
+        const archivo = new File([pdfBlob], nombreDoc, { type: 'application/pdf' });
 
+        // Restauramos el botón
+        btnCompartirPDF.innerHTML = textoOriginal;
+        btnCompartirPDF.disabled = false;
+
+        // Intentamos compartir de forma nativa
+        if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+            try {
+                await navigator.share({
+                    files: [archivo],
+                    title: 'Documento Escaneado'
+                });
+            } catch (error) {
+                // El famoso error silencioso. Si Android bloquea el menú, disparamos la descarga
+                if (error.name !== 'AbortError') {
+                    forzarDescarga(pdfBlob, nombreDoc);
+                }
+            }
         } else {
-            // --- LÓGICA PARA TAMAÑO DINÁMICO (La que ya tenías) ---
-            doc.addPage([pagina.ancho, pagina.alto], pagina.ancho > pagina.alto ? 'l' : 'p');
-            doc.addImage(pagina.datos, 'JPEG', 0, 0, pagina.ancho, pagina.alto);
+            // Si estamos en PC o el móvil no soporta compartir archivos nativos
+            forzarDescarga(pdfBlob, nombreDoc);
         }
-    });
-
-    const pdfBlob = doc.output('blob');
-    const archivo = new File([pdfBlob], `documento_${Date.now()}.pdf`, { type: 'application/pdf' });
-
-    if (navigator.share) {
-        try {
-            await navigator.share({
-                files: [archivo],
-                title: 'Documento Escaneado',
-                text: 'PDF generado desde Aethelgard.'
-            });
-        } catch (error) {
-            console.log('Error al compartir PDF', error);
-        }
-    } else {
-        // Fallback: Descarga segura compatible con PWA
-        const url = URL.createObjectURL(pdfBlob);
-        const enlace = document.createElement('a');
-        enlace.style.display = 'none';
-        enlace.href = url;
-        enlace.download = archivo.name;
-        document.body.appendChild(enlace); // CRUCIAL: Lo pegamos al HTML
-        enlace.click();
-
-        setTimeout(() => {
-            document.body.removeChild(enlace);
-            URL.revokeObjectURL(url);
-        }, 100);
-    }
+    }, 50); // Fin del setTimeout
 });
 
 // 4. Reiniciar el estado por completo
