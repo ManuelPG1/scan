@@ -181,13 +181,25 @@ button:disabled {
 /* Corrección del Flexbox para los botones del filtro */
 .btn-group {
     display: flex;
+    /* Apilamos los botones verticalmente en móviles */
+    flex-direction: column-reverse;
     gap: 10px;
     width: 100%;
 }
+
 .btn-group button {
-    flex: 1;
+    width: 100%;
     margin-bottom: 0;
-    min-width: 0; /* ESTO ARREGLA EL FALLO DEL OVERFLOW */
+}
+
+/* Cuando la pantalla sea grande (PC o móvil en horizontal), se pondrán lado a lado */
+@media (min-width: 450px) {
+    .btn-group {
+        flex-direction: row;
+    }
+    .btn-group button {
+        flex: 1;
+    }
 }
 
 /* --- INPUTS Y FORMULARIOS --- */
