@@ -82,26 +82,103 @@ function dibujarEscena() {
         ctx.lineTo(puntos[i].x, puntos[i].y);
     }
     ctx.closePath();
-    ctx.lineWidth = 4;
+    ctx.lineWidth = 2;
    // ctx.strokeStyle = '#b85d19'; // Color cobre
-    ctx.strokeStyle = '#3b82f6'; // Azul eléctrico de la paleta
+    //ctx.strokeStyle = '#3b82f6'; // Azul eléctrico de la paleta
+    ctx.strokeStyle = '#00fa9a'; // Verde láser
     ctx.stroke();
     //ctx.fillStyle = 'rgba(184, 93, 25, 0.2)';
-    ctx.fillStyle = 'rgba(59, 130, 246, 0.15)'; // Mismo azul, semitransparente
+    //ctx.fillStyle = 'rgba(59, 130, 246, 0.15)'; // Mismo azul, semitransparente
+    ctx.fillStyle = 'rgba(0, 250, 154, 0.1)';
     ctx.fill();
 
     // Dibujamos los 4 puntos (manejadores)
     puntos.forEach(p => {
         ctx.beginPath();
         ctx.arc(p.x, p.y, radioPunto, 0, Math.PI * 2);
-        ctx.fillStyle = '#ffffff';
+        //ctx.fillStyle = '#ffffff';
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
         ctx.fill();
-        ctx.lineWidth = 3;
+        ctx.lineWidth = 2;
        // ctx.strokeStyle = '#b85d19'; // Color cobre
-        ctx.strokeStyle = '#3b82f6'; // Borde azul
+        //ctx.strokeStyle = '#3b82f6'; // Borde azul
+        ctx.strokeStyle = '#00fa9a';
         ctx.stroke();
     });
+
+
+    // NUEVO: Dibujamos la lupa si el usuario está arrastrando un punto
+    if (puntoArrastrado !== null) {
+        dibujarLupa(puntos[puntoArrastrado].x, puntos[puntoArrastrado].y);
+    }
+
 }
+
+// --- NUEVO: FUNCIÓN DE LUPA DE PRECISIÓN ---
+function dibujarLupa(x, y) {
+    // 1. Calculamos la escala real vs visual.
+    // Las fotos son inmensas (ej: 4000px), pero en el móvil se ven a 400px.
+    const rect = canvas.getBoundingClientRect();
+    const escalaCanvas = canvas.width / rect.width;
+
+    // Configuramos el tamaño visual de la lupa (75 píxeles en la pantalla del móvil) y el zoom
+    const radioLupaCanvas = 75 * escalaCanvas;
+    const zoom = 2.5;
+
+    // 2. Esquivamos el dedo de forma inteligente:
+    // Si tu dedo está en la mitad izquierda, dibujamos la lupa a la derecha (y viceversa).
+    let lupaX = x < canvas.width / 2 ? canvas.width - radioLupaCanvas - (20 * escalaCanvas) : radioLupaCanvas + (20 * escalaCanvas);
+    let lupaY = radioLupaCanvas + (20 * escalaCanvas); // Siempre arriba
+
+    ctx.save();
+
+    // 3. Crear el monóculo (Un círculo que enmascarará lo que dibujemos dentro)
+    ctx.beginPath();
+    ctx.arc(lupaX, lupaY, radioLupaCanvas, 0, Math.PI * 2);
+    ctx.lineWidth = 6 * escalaCanvas;
+    ctx.strokeStyle = '#f8fafc'; // Borde blanco interior
+    ctx.stroke();
+
+    // Un marco exterior azul para que parezca una lente de alta tecnología
+    ctx.lineWidth = 4 * escalaCanvas;
+    //ctx.strokeStyle = '#3b82f6';
+    ctx.strokeStyle = '#00fa9a';
+    ctx.stroke();
+
+    // Activamos la máscara: todo lo que se dibuje a partir de aquí no se saldrá del círculo
+    ctx.clip();
+
+    // 4. Dibujar la imagen ampliada
+    const tamañoOrigen = (radioLupaCanvas * 2) / zoom;
+    const origenX = x - tamañoOrigen / 2;
+    const origenY = y - tamañoOrigen / 2;
+
+    // drawImage(imagen, sourceX, sourceY, sourceW, sourceH, destX, destY, destW, destH)
+    ctx.drawImage(
+        img,
+        origenX, origenY, tamañoOrigen, tamañoOrigen,
+        lupaX - radioLupaCanvas, lupaY - radioLupaCanvas, radioLupaCanvas * 2, radioLupaCanvas * 2
+    );
+
+    // 5. El "Punto de mira" en el centro exacto de la lupa
+    ctx.beginPath();
+    const tamañoCruz = 15 * escalaCanvas;
+
+    // Línea horizontal
+    ctx.moveTo(lupaX - tamañoCruz, lupaY);
+    ctx.lineTo(lupaX + tamañoCruz, lupaY);
+    // Línea vertical
+    ctx.moveTo(lupaX, lupaY - tamañoCruz);
+    ctx.lineTo(lupaX, lupaY + tamañoCruz);
+
+    //ctx.strokeStyle = '#ef4444'; // Rojo láser
+    ctx.strokeStyle = '#ff3366';
+    ctx.lineWidth = 1.5 * escalaCanvas;
+    ctx.stroke();
+
+    ctx.restore();
+}
+
 
 // 3. Utilidad para obtener las coordenadas exactas del toque/clic
 // Esto es vital porque el canvas en CSS se encoge para caber en el móvil
@@ -176,6 +253,14 @@ const vistasPrevias = document.getElementById('vistasPrevias');
 const controlesFiltro = document.getElementById('controlesFiltro');
 const rangoSensibilidad = document.getElementById('rangoSensibilidad');
 
+
+const panelRecorte = document.getElementById('panelRecorte');
+const panelFiltros = document.getElementById('panelFiltros');
+const btnVolver = document.getElementById('btnVolver');
+const btnConfirmar = document.getElementById('btnConfirmar');
+
+let matRecortadaGlobal = null; // Guardará el recorte virgen en memoria
+
 // Mostrar u ocultar el slider cuando se marca "Blanco y Negro"
 checkBlancoNegro.addEventListener('change', (e) => {
     controlesFiltro.style.display = e.target.checked ? 'block' : 'none';
@@ -186,109 +271,121 @@ let listaPaginas = [];
 let imagenActualBase64 = null;
 let dimensionesActuales = { ancho: 0, alto: 0 };
 
+// --- 1. BOTÓN APLICAR RECORTE ---
 btnEscanear.addEventListener('click', () => {
-    if (typeof cv === 'undefined' || puntos.length !== 4) {
-        alert("Espera a que cargue la librería o selecciona una imagen.");
-        return;
-    }
+    if (typeof cv === 'undefined' || puntos.length !== 4) return;
 
     let src = cv.imread(img);
 
-    // 2. Calcular el ancho y alto del nuevo documento rectángular
-    // Usamos el teorema de Pitágoras para medir la distancia máxima entre los puntos
     let ancho = Math.max(
-        Math.hypot(puntos[0].x - puntos[1].x, puntos[0].y - puntos[1].y), // Lado superior
-                         Math.hypot(puntos[3].x - puntos[2].x, puntos[3].y - puntos[2].y)  // Lado inferior
+        Math.hypot(puntos[0].x - puntos[1].x, puntos[0].y - puntos[1].y),
+                         Math.hypot(puntos[3].x - puntos[2].x, puntos[3].y - puntos[2].y)
     );
     let alto = Math.max(
-        Math.hypot(puntos[0].x - puntos[3].x, puntos[0].y - puntos[3].y), // Lado izquierdo
-                        Math.hypot(puntos[1].x - puntos[2].x, puntos[1].y - puntos[2].y)  // Lado derecho
+        Math.hypot(puntos[0].x - puntos[3].x, puntos[0].y - puntos[3].y),
+                        Math.hypot(puntos[1].x - puntos[2].x, puntos[1].y - puntos[2].y)
     );
 
-    // 3. Transformación de perspectiva (Recorte)
     let ptsOrigen = cv.matFromArray(4, 1, cv.CV_32FC2, [
-        puntos[0].x, puntos[0].y,
-        puntos[1].x, puntos[1].y,
-        puntos[2].x, puntos[2].y,
-        puntos[3].x, puntos[3].y
+        puntos[0].x, puntos[0].y, puntos[1].x, puntos[1].y,
+        puntos[2].x, puntos[2].y, puntos[3].x, puntos[3].y
     ]);
     let ptsDestino = cv.matFromArray(4, 1, cv.CV_32FC2, [
-        0, 0,               ancho, 0,
-        ancho, alto,        0, alto
+        0, 0, ancho, 0, ancho, alto, 0, alto
     ]);
 
     let matrizTransformacion = cv.getPerspectiveTransform(ptsOrigen, ptsDestino);
-    let imgRecortada = new cv.Mat();
-    cv.warpPerspective(src, imgRecortada, matrizTransformacion, new cv.Size(ancho, alto));
 
-    // 4. APLICAR EFECTO ESCÁNER (Tu lógica de Python en JS)
-    // --- 4. NUEVA ARQUITECTURA DE PROCESAMIENTO VISUAL ---
+    // Guardamos la imagen recortada original en nuestra variable global
+    matRecortadaGlobal = new cv.Mat();
+    cv.warpPerspective(src, matRecortadaGlobal, matrizTransformacion, new cv.Size(ancho, alto));
+    dimensionesActuales = { ancho: ancho, alto: alto };
+
+    // Limpieza de matrices temporales
+    src.delete(); ptsOrigen.delete(); ptsDestino.delete(); matrizTransformacion.delete();
+
+    // Cambiamos el estado de la interfaz
+    panelRecorte.style.display = 'none';
+    panelFiltros.style.display = 'flex';
+
+    // Aplicamos los filtros por primera vez
+    aplicarFiltros();
+});
+
+// --- 2. FUNCIÓN PARA APLICAR FILTROS EN TIEMPO REAL ---
+function aplicarFiltros() {
+    if (!matRecortadaGlobal) return;
+
     let imgProcesada = new cv.Mat();
+    // Clonamos la imagen original recortada para no destruirla con los filtros
+    matRecortadaGlobal.copyTo(imgProcesada);
 
     if (checkBlancoNegro.checked) {
-        // --- MODO DOCUMENTO PURO (BLANCO Y NEGRO) ---
-
-        // 1. Escala de grises
-        cv.cvtColor(imgRecortada, imgProcesada, cv.COLOR_RGBA2GRAY, 0);
-
-        // 2. Desenfoque inicial ligero para planchar el ruido del sensor
+        cv.cvtColor(imgProcesada, imgProcesada, cv.COLOR_RGBA2GRAY, 0);
         cv.GaussianBlur(imgProcesada, imgProcesada, new cv.Size(5, 5), 0, 0, cv.BORDER_DEFAULT);
-
-        // 3. Umbral Adaptativo de Bloque Gigante
-        // Al usar un bloque de 81 o superior, el filtro es capaz de "ver" fuera del código QR
-        // y darse cuenta de que es una figura negra sobre papel blanco, no dejándolo hueco.
-        let blockSize = 85; // DEBE ser un número impar.
         let constante = parseInt(rangoSensibilidad.value);
-
-
-        cv.adaptiveThreshold(
-            imgProcesada,
-            imgProcesada,
-            255,
-            cv.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv.THRESH_BINARY,
-            blockSize,
-            constante
-        );
-
+        cv.adaptiveThreshold(imgProcesada, imgProcesada, 255, cv.ADAPTIVE_THRESH_GAUSSIAN_C, cv.THRESH_BINARY, 85, constante);
     } else {
-        // --- MODO FOTOGRAFÍA / REVISTA (COLOR) ---
-
         let imgDesenfocada = new cv.Mat();
-
-        // 1. Aumento sutil de contraste y brillo para quitar el tono grisáceo
-        imgRecortada.convertTo(imgProcesada, -1, 1.1, 15);
-
-        // 2. Creamos una copia desenfocada de la imagen original
+        imgProcesada.convertTo(imgProcesada, -1, 1.1, 15);
         cv.GaussianBlur(imgProcesada, imgDesenfocada, new cv.Size(0, 0), 3, 3, cv.BORDER_DEFAULT);
-
-        // 3. Unsharp Masking (Máscara de Desenfoque)
-        // Al restar la copia borrosa a la original, logramos que solo los bordes nítidos
-        // (letras, dibujos) destaquen, ignorando el ruido del fondo.
-        // Fórmula: (Original * 1.5) + (Borrosa * -0.5) + 0
         cv.addWeighted(imgProcesada, 1.5, imgDesenfocada, -0.5, 0, imgProcesada);
-
-        imgDesenfocada.delete(); // Limpieza de memoria temporal
+        imgDesenfocada.delete();
     }
-    // 6. Mostrar el resultado final
-    canvas.width = ancho;
-    canvas.height = alto;
+
+    canvas.width = dimensionesActuales.ancho;
+    canvas.height = dimensionesActuales.alto;
     cv.imshow('lienzoApp', imgProcesada);
 
-    // Guardamos las dimensiones y el contenido en Base64 de la página escaneada
-    dimensionesActuales = { ancho: ancho, alto: alto };
-    imagenActualBase64 = canvas.toDataURL('image/jpeg', 0.85); // 0.85 mantiene buena compresión/calidad
+    imgProcesada.delete(); // Limpiamos la clonación
+}
 
-    // Activamos los botones de acción inmediata
-    btnGuardarPagina.disabled = false;
-    btnCompartirImagen.disabled = false;
+// Escuchadores para actualizar los filtros en vivo
+checkBlancoNegro.addEventListener('change', (e) => {
+    controlesFiltro.style.display = e.target.checked ? 'block' : 'none';
+    aplicarFiltros();
+});
 
+// Usamos 'input' para que se actualice MIENTRAS arrastras el dedo
+rangoSensibilidad.addEventListener('input', aplicarFiltros);
+
+// --- 3. BOTÓN VOLVER (REAJUSTAR PUNTOS) ---
+btnVolver.addEventListener('click', () => {
+    // Vaciamos la memoria global
+    if (matRecortadaGlobal) {
+        matRecortadaGlobal.delete();
+        matRecortadaGlobal = null;
+    }
+
+    // Cambiamos la interfaz de vuelta
+    panelFiltros.style.display = 'none';
+    panelRecorte.style.display = 'flex';
+
+    // Restauramos el Canvas original con los puntos en la posición exacta donde los dejaste
+    canvas.width = img.width;
+    canvas.height = img.height;
+    dibujarEscena();
+});
+
+// --- 4. BOTÓN CONFIRMAR ---
+btnConfirmar.addEventListener('click', () => {
+    // Guardamos el resultado en Base64
+    imagenActualBase64 = canvas.toDataURL('image/jpeg', 0.85);
+
+    // Limpiamos la memoria global
+    if (matRecortadaGlobal) {
+        matRecortadaGlobal.delete();
+        matRecortadaGlobal = null;
+    }
+
+    // Restauramos la interfaz para la SIGUIENTE foto
+    panelFiltros.style.display = 'none';
+    panelRecorte.style.display = 'flex';
     puntos = [];
 
-    // Limpieza de memoria OpenCV
-    src.delete(); ptsOrigen.delete(); ptsDestino.delete();
-    matrizTransformacion.delete(); imgRecortada.delete();
-    imgProcesada.delete(); matrizKernel.delete();
+    // Automatizamos el clic en el botón oculto "Añadir y Siguiente"
+    btnGuardarPagina.disabled = false;
+    btnGuardarPagina.click();
 });
 
 // --- NUEVA LÓGICA DE ALMACENAMIENTO Y DESCARGA ---
