@@ -303,3 +303,33 @@ select.input-tecnico {
     right: -8px;
     font-family: monospace;
 }
+
+/* --- NAVEGACIÓN DE MÓDULOS --- */
+.nav-modulos {
+    width: 100%;
+    max-width: 500px;
+    display: flex;
+    gap: 2px; /* Pequeña separación técnica entre pestañas */
+    margin-bottom: 20px;
+    background-color: var(--border-dim);
+    padding: 2px;
+    border-radius: 4px;
+}
+
+.tab-btn {
+    flex: 1;
+    margin: 0;
+    background-color: var(--bg-panel);
+    color: var(--text-muted);
+    border: none;
+    padding: 12px;
+    font-size: 0.8rem;
+    border-radius: 2px;
+    transition: all 0.2s;
+}
+
+.tab-btn.tab-activo {
+    background-color: var(--accent-dim);
+    color: var(--accent-green);
+    border-bottom: 2px solid var(--accent-green);
+}
