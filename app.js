@@ -304,6 +304,11 @@ function sincronizarOrdenArray() {
 
     // Reordenamos nuestro array interno de páginas para que coincida
     listaPaginas.sort((a, b) => ordenVisualIds.indexOf(a.id) - ordenVisualIds.indexOf(b.id));
+    // Reiniciar el botón de PDF por si habían generado uno antes
+    pdfBlobGenerado = null;
+    pdfArchivoGenerado = null;
+    btnCompartirPDF.innerHTML = "Crear y Compartir PDF 📤";
+    btnCompartirPDF.style.backgroundColor = "";
 }
 
 // 1. Añadir la página escaneada al lote
@@ -312,7 +317,11 @@ btnGuardarPagina.addEventListener('click', () => {
 
     // Creamos un ID único basado en el tiempo exacto
     const idUnico = "pag_" + Date.now();
-
+    // Reiniciar el botón de PDF por si habían generado uno antes
+    pdfBlobGenerado = null;
+    pdfArchivoGenerado = null;
+    btnCompartirPDF.innerHTML = "Crear y Compartir PDF 📤";
+    btnCompartirPDF.style.backgroundColor = "";
     // Guardamos los datos con su ID
     listaPaginas.push({
         id: idUnico,
@@ -344,6 +353,11 @@ btnGuardarPagina.addEventListener('click', () => {
             listaPaginas = listaPaginas.filter(p => p.id !== idUnico);
             // Quitamos la miniatura de la pantalla
             wrapper.remove();
+            // Reiniciar el botón de PDF por si habían generado uno antes
+            pdfBlobGenerado = null;
+            pdfArchivoGenerado = null;
+            btnCompartirPDF.innerHTML = "Crear y Compartir PDF 📤";
+            btnCompartirPDF.style.backgroundColor = "";
 
             // Actualizamos la interfaz
             contadorPaginas.textContent = listaPaginas.length;
@@ -423,22 +437,22 @@ function base64ToBlob(base64, mimeType) {
     return new Blob([ab], { type: mimeType });
 }
 
-// NUEVO: Función a prueba de fallos para forzar la descarga en el móvil
-function forzarDescarga(blob, nombreArchivo) {
-    const url = URL.createObjectURL(blob);
-    const enlace = document.createElement('a');
-    enlace.style.display = 'none';
-    enlace.href = url;
-    enlace.download = nombreArchivo;
-    document.body.appendChild(enlace);
-    enlace.click();
-    setTimeout(() => {
-        document.body.removeChild(enlace);
-        URL.revokeObjectURL(url);
-    }, 100);
+// NUEVO: Descarga a prueba de PWAs (Convierte el Blob a Base64 nativo)
+function descargarPwaSeguro(blob, nombreArchivo) {
+    const reader = new FileReader();
+    reader.onloadend = function() {
+        const enlace = document.createElement('a');
+        enlace.style.display = 'none';
+        enlace.href = reader.result; // Data URI, 100% compatible con Gestor de Descargas Android
+        enlace.download = nombreArchivo;
+        document.body.appendChild(enlace);
+        enlace.click();
+        setTimeout(() => document.body.removeChild(enlace), 100);
+    };
+    reader.readAsDataURL(blob);
 }
 
-// 2. Descargar o Compartir IMAGEN
+// 2. COMPARTIR IMAGEN
 btnCompartirImagen.addEventListener('click', async () => {
     if (!imagenActualBase64) return;
 
@@ -448,34 +462,46 @@ btnCompartirImagen.addEventListener('click', async () => {
 
     if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
         try {
-            await navigator.share({
-                files: [archivo],
-                title: 'Imagen Escaneada'
-            });
+            await navigator.share({ files: [archivo], title: 'Imagen Escaneada' });
         } catch (error) {
-            // Si falla por seguridad (o no es AbortError de cancelar a mano), forzamos descarga
-            if (error.name !== 'AbortError') {
-                forzarDescarga(blob, nombreArchivo);
-            }
+            if (error.name !== 'AbortError') descargarPwaSeguro(blob, nombreArchivo);
         }
     } else {
-        // Fallback directo para PC o móviles no compatibles
-        forzarDescarga(blob, nombreArchivo);
+        descargarPwaSeguro(blob, nombreArchivo);
     }
 });
 
-// 3. Compilar y Compartir PDF
+
+// --- LÓGICA DE PDF EN 2 PASOS (Evita el bloqueo de Android) ---
+let pdfBlobGenerado = null;
+let pdfArchivoGenerado = null;
+
 btnCompartirPDF.addEventListener('click', async () => {
     if (listaPaginas.length === 0) return;
 
-    // Cambiamos el texto del botón visualmente para que el usuario sepa que está cargando
+    // PASO 2: Si el PDF ya está generado, lo compartimos INSTANTÁNEAMENTE
+    if (pdfArchivoGenerado) {
+        if (navigator.canShare && navigator.canShare({ files: [pdfArchivoGenerado] })) {
+            try {
+                await navigator.share({
+                    files: [pdfArchivoGenerado],
+                    title: 'Documento Escaneado'
+                });
+            } catch (error) {
+                if (error.name !== 'AbortError') descargarPwaSeguro(pdfBlobGenerado, pdfArchivoGenerado.name);
+            }
+        } else {
+            descargarPwaSeguro(pdfBlobGenerado, pdfArchivoGenerado.name);
+        }
+        return; // Salimos para que no vuelva a generar el PDF
+    }
+
+    // PASO 1: Generar el PDF (Bloquea la pantalla, así que lo hacemos separado del Share)
     const textoOriginal = btnCompartirPDF.innerHTML;
     btnCompartirPDF.innerHTML = "Generando PDF... ⏳";
     btnCompartirPDF.disabled = true;
 
-    // Le damos un pequeño respiro de 50ms al navegador para que actualice el texto del botón
-    // antes de bloquearse procesando el PDF
-    setTimeout(async () => {
+    setTimeout(() => {
         const { jsPDF } = window.jspdf;
         const formato = document.getElementById('formatoPdf').value;
 
@@ -490,13 +516,9 @@ btnCompartirPDF.addEventListener('click', async () => {
 
             if (formato === 'a4') {
                 doc.addPage('a4', 'p');
-                const anchoA4 = 210;
-                const altoA4 = 297;
-                const ratioImagen = pagina.ancho / pagina.alto;
-                const ratioA4 = anchoA4 / altoA4;
-                let anchoFinal = anchoA4;
-                let altoFinal = altoA4;
-                let x = 0, y = 0;
+                const anchoA4 = 210, altoA4 = 297;
+                const ratioImagen = pagina.ancho / pagina.alto, ratioA4 = anchoA4 / altoA4;
+                let anchoFinal = anchoA4, altoFinal = altoA4, x = 0, y = 0;
 
                 if (ratioImagen > ratioA4) {
                     altoFinal = anchoA4 / ratioImagen;
@@ -512,32 +534,37 @@ btnCompartirPDF.addEventListener('click', async () => {
             }
         });
 
-        const pdfBlob = doc.output('blob');
+        // Guardamos el PDF en memoria para el Paso 2
+        pdfBlobGenerado = doc.output('blob');
         const nombreDoc = `documento_${Date.now()}.pdf`;
-        const archivo = new File([pdfBlob], nombreDoc, { type: 'application/pdf' });
+        pdfArchivoGenerado = new File([pdfBlobGenerado], nombreDoc, { type: 'application/pdf' });
 
-        // Restauramos el botón
-        btnCompartirPDF.innerHTML = textoOriginal;
+        // Transformamos el botón para el Paso 2
+        btnCompartirPDF.innerHTML = "📤 ¡PDF Listo! Tocar para Compartir";
+        btnCompartirPDF.style.backgroundColor = "#10b981"; // Color verde éxito
         btnCompartirPDF.disabled = false;
+    }, 50);
+});
 
-        // Intentamos compartir de forma nativa
-        if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
-            try {
-                await navigator.share({
-                    files: [archivo],
-                    title: 'Documento Escaneado'
-                });
-            } catch (error) {
-                // El famoso error silencioso. Si Android bloquea el menú, disparamos la descarga
-                if (error.name !== 'AbortError') {
-                    forzarDescarga(pdfBlob, nombreDoc);
-                }
-            }
-        } else {
-            // Si estamos en PC o el móvil no soporta compartir archivos nativos
-            forzarDescarga(pdfBlob, nombreDoc);
-        }
-    }, 50); // Fin del setTimeout
+// 4. Reiniciar el estado por completo
+btnLimpiar.addEventListener('click', () => {
+    if (confirm("¿Seguro que quieres borrar todas las páginas guardadas?")) {
+        listaPaginas = [];
+        imagenActualBase64 = null;
+        pdfBlobGenerado = null;
+        pdfArchivoGenerado = null;
+
+        contadorPaginas.textContent = "0";
+        vistasPrevias.innerHTML = "";
+
+        btnCompartirPDF.innerHTML = "Crear y Compartir PDF 📤";
+        btnCompartirPDF.style.backgroundColor = "";
+        btnCompartirPDF.disabled = true;
+        btnGuardarPagina.disabled = true;
+        btnCompartirImagen.disabled = true;
+
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
 });
 
 // 4. Reiniciar el estado por completo
