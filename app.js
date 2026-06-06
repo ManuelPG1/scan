@@ -16,6 +16,9 @@ const inputImagen = document.getElementById('inputImagen');
 const canvas = document.getElementById('lienzoApp');
 const ctx = canvas.getContext('2d');
 
+const btnModoLibro = document.getElementById('btnModoLibro');
+let modoLibroActivo = false;
+
 let img = new Image();
 let puntos = []; // Guardará las 4 esquinas: [{x,y}, {x,y}, {x,y}, {x,y}]
 let puntoArrastrado = null; // Índice del punto que estamos moviendo
@@ -36,6 +39,51 @@ inputImagen.addEventListener('change', (e) => {
     cargarSiguienteArchivo();
 });
 
+
+// Evento para alternar entre 4 y 8 puntos
+btnModoLibro.addEventListener('click', () => {
+    if (!img.src || puntos.length === 0) return;
+
+    modoLibroActivo = !modoLibroActivo;
+
+    if (modoLibroActivo) {
+        btnModoLibro.innerText = "[ MODO: LIBRO 3D (8 PUNTOS) ]";
+        btnModoLibro.style.color = "var(--accent-green)";
+        btnModoLibro.style.borderColor = "var(--accent-green)";
+
+        // Convertimos 4 puntos a 8 insertando puntos medios
+        // Orden (Horario): 0(SupIzq), 1(SupMed), 2(SupDer), 3(DerMed), 4(InfDer), 5(InfMed), 6(InfIzq), 7(IzqMed)
+        puntos = [
+            puntos[0], // 0
+            { x: (puntos[0].x + puntos[1].x) / 2, y: (puntos[0].y + puntos[1].y) / 2 }, // 1
+                              puntos[1], // 2
+                              { x: (puntos[1].x + puntos[2].x) / 2, y: (puntos[1].y + puntos[2].y) / 2 }, // 3
+                              puntos[2], // 4
+                              { x: (puntos[2].x + puntos[3].x) / 2, y: (puntos[2].y + puntos[3].y) / 2 }, // 5
+                              puntos[3], // 6
+                              { x: (puntos[3].x + puntos[0].x) / 2, y: (puntos[3].y + puntos[0].y) / 2 }  // 7
+        ];
+    } else {
+        btnModoLibro.innerText = "[ MODO: PLANO (4 PUNTOS) ]";
+        btnModoLibro.style.color = "var(--text-muted)";
+        btnModoLibro.style.borderColor = "var(--border-bright)";
+
+        // Volvemos a 4 puntos (solo las esquinas: índices 0, 2, 4, 6)
+        if (puntos.length === 8) {
+            puntos = [puntos[0], puntos[2], puntos[4], puntos[6]];
+        }
+    }
+    dibujarEscena();
+});
+
+// Fórmula de Curva de Bézier Cuadrática
+function puntoBezier(t, p0, p1, p2) {
+    const u = 1 - t;
+    return {
+        x: (u * u * p0.x) + (2 * u * t * p1.x) + (t * t * p2.x),
+        y: (u * u * p0.y) + (2 * u * t * p1.y) + (t * t * p2.y)
+    };
+}
 // Función para ir procesando la cola uno a uno
 function cargarSiguienteArchivo() {
     if (colaArchivos.length === 0) {
@@ -78,8 +126,18 @@ function dibujarEscena() {
     // Dibujamos el polígono que une los 4 puntos (el área a recortar)
     ctx.beginPath();
     ctx.moveTo(puntos[0].x, puntos[0].y);
-    for (let i = 1; i < puntos.length; i++) {
-        ctx.lineTo(puntos[i].x, puntos[i].y);
+
+    if (modoLibroActivo && puntos.length === 8) {
+        // Dibujamos curvas cuadráticas usando los puntos medios como controles de tensión
+        ctx.quadraticCurveTo(puntos[1].x, puntos[1].y, puntos[2].x, puntos[2].y); // Borde superior
+        ctx.quadraticCurveTo(puntos[3].x, puntos[3].y, puntos[4].x, puntos[4].y); // Borde derecho
+        ctx.quadraticCurveTo(puntos[5].x, puntos[5].y, puntos[6].x, puntos[6].y); // Borde inferior
+        ctx.quadraticCurveTo(puntos[7].x, puntos[7].y, puntos[0].x, puntos[0].y); // Borde izquierdo
+    } else {
+        // Líneas rectas clásicas
+        for (let i = 1; i < puntos.length; i++) {
+            ctx.lineTo(puntos[i].x, puntos[i].y);
+        }
     }
     ctx.closePath();
     ctx.lineWidth = 2;
@@ -259,6 +317,8 @@ const panelFiltros = document.getElementById('panelFiltros');
 const btnVolver = document.getElementById('btnVolver');
 const btnConfirmar = document.getElementById('btnConfirmar');
 
+
+
 let matRecortadaGlobal = null; // Guardará el recorte virgen en memoria
 
 // Mostrar u ocultar el slider cuando se marca "Blanco y Negro"
@@ -271,39 +331,97 @@ let listaPaginas = [];
 let imagenActualBase64 = null;
 let dimensionesActuales = { ancho: 0, alto: 0 };
 
+
+
 // --- 1. BOTÓN APLICAR RECORTE ---
 btnEscanear.addEventListener('click', () => {
-    if (typeof cv === 'undefined' || puntos.length !== 4) return;
+    if (typeof cv === 'undefined' || puntos.length < 4) return;
 
     let src = cv.imread(img);
-
-    let ancho = Math.max(
-        Math.hypot(puntos[0].x - puntos[1].x, puntos[0].y - puntos[1].y),
-                         Math.hypot(puntos[3].x - puntos[2].x, puntos[3].y - puntos[2].y)
-    );
-    let alto = Math.max(
-        Math.hypot(puntos[0].x - puntos[3].x, puntos[0].y - puntos[3].y),
-                        Math.hypot(puntos[1].x - puntos[2].x, puntos[1].y - puntos[2].y)
-    );
-
-    let ptsOrigen = cv.matFromArray(4, 1, cv.CV_32FC2, [
-        puntos[0].x, puntos[0].y, puntos[1].x, puntos[1].y,
-        puntos[2].x, puntos[2].y, puntos[3].x, puntos[3].y
-    ]);
-    let ptsDestino = cv.matFromArray(4, 1, cv.CV_32FC2, [
-        0, 0, ancho, 0, ancho, alto, 0, alto
-    ]);
-
-    let matrizTransformacion = cv.getPerspectiveTransform(ptsOrigen, ptsDestino);
-
-    // Guardamos la imagen recortada original en nuestra variable global
     matRecortadaGlobal = new cv.Mat();
-    cv.warpPerspective(src, matRecortadaGlobal, matrizTransformacion, new cv.Size(ancho, alto));
-    dimensionesActuales = { ancho: ancho, alto: alto };
+    dimensionesActuales = { ancho: 0, alto: 0 };
 
-    // Limpieza de matrices temporales
-    src.delete(); ptsOrigen.delete(); ptsDestino.delete(); matrizTransformacion.delete();
+    if (!modoLibroActivo) {
+        // --- MOTOR CLÁSICO: PERSPECTIVA PLANA (4 Puntos) ---
+        let ancho = Math.max(
+            Math.hypot(puntos[0].x - puntos[1].x, puntos[0].y - puntos[1].y),
+                             Math.hypot(puntos[3].x - puntos[2].x, puntos[3].y - puntos[2].y)
+        );
+        let alto = Math.max(
+            Math.hypot(puntos[0].x - puntos[3].x, puntos[0].y - puntos[3].y),
+                            Math.hypot(puntos[1].x - puntos[2].x, puntos[1].y - puntos[2].y)
+        );
 
+        let ptsOrigen = cv.matFromArray(4, 1, cv.CV_32FC2, [
+            puntos[0].x, puntos[0].y, puntos[1].x, puntos[1].y,
+            puntos[2].x, puntos[2].y, puntos[3].x, puntos[3].y
+        ]);
+        let ptsDestino = cv.matFromArray(4, 1, cv.CV_32FC2, [0, 0, ancho, 0, ancho, alto, 0, alto]);
+
+        let matrizTransformacion = cv.getPerspectiveTransform(ptsOrigen, ptsDestino);
+        cv.warpPerspective(src, matRecortadaGlobal, matrizTransformacion, new cv.Size(ancho, alto));
+
+        dimensionesActuales = { ancho: ancho, alto: alto };
+        ptsOrigen.delete(); ptsDestino.delete(); matrizTransformacion.delete();
+
+    } else {
+        // --- NUEVO MOTOR: DE-WARPING CURVO (8 Puntos + Remap) ---
+
+        // 1. Calculamos las dimensiones del rectángulo aplanado
+        let ancho = Math.max(
+            Math.hypot(puntos[0].x - puntos[2].x, puntos[0].y - puntos[2].y),
+                             Math.hypot(puntos[6].x - puntos[4].x, puntos[6].y - puntos[4].y)
+        );
+        let alto = Math.max(
+            Math.hypot(puntos[0].x - puntos[6].x, puntos[0].y - puntos[6].y),
+                            Math.hypot(puntos[2].x - puntos[4].x, puntos[2].y - puntos[4].y)
+        );
+        dimensionesActuales = { ancho: ancho, alto: alto };
+
+        // 2. Generamos una malla de baja resolución (20x20)
+        const gridX = 20;
+        const gridY = 20;
+        let mapXSmall = new cv.Mat(gridY, gridX, cv.CV_32FC1);
+        let mapYSmall = new cv.Mat(gridY, gridX, cv.CV_32FC1);
+
+        for (let i = 0; i < gridY; i++) {
+            let v = i / (gridY - 1); // Progreso vertical (0 a 1)
+
+// Puntos interpolados en el borde izquierdo y derecho para esta fila
+let pIzquierda = puntoBezier(v, puntos[0], puntos[7], puntos[6]);
+let pDerecha = puntoBezier(v, puntos[2], puntos[3], puntos[4]);
+
+for (let j = 0; j < gridX; j++) {
+    let u = j / (gridX - 1); // Progreso horizontal (0 a 1)
+
+// Puntos interpolados en el borde superior e inferior para esta columna
+let pArriba = puntoBezier(u, puntos[0], puntos[1], puntos[2]);
+let pAbajo = puntoBezier(u, puntos[6], puntos[5], puntos[4]);
+
+// Coons Patch simplificado: Interpolación bilineal de coordenadas
+let xCoord = (1 - v) * pArriba.x + v * pAbajo.x;
+let yCoord = (1 - u) * pIzquierda.y + u * pDerecha.y;
+
+// Guardamos en la matriz de la malla usando Float32
+mapXSmall.floatPtr(i, j)[0] = xCoord;
+mapYSmall.floatPtr(i, j)[0] = yCoord;
+}
+        }
+
+        // 3. El Hack de Rendimiento: Ampliamos la malla 20x20 a resolución total (Ej: 1500x2000)
+        let mapX = new cv.Mat();
+        let mapY = new cv.Mat();
+        cv.resize(mapXSmall, mapX, new cv.Size(ancho, alto), 0, 0, cv.INTER_LINEAR);
+        cv.resize(mapYSmall, mapY, new cv.Size(ancho, alto), 0, 0, cv.INTER_LINEAR);
+
+        // 4. Aplicamos el re-mapeo curvo sobre la imagen de alta resolución
+        cv.remap(src, matRecortadaGlobal, mapX, mapY, cv.INTER_LINEAR, cv.BORDER_CONSTANT, new cv.Scalar(0, 0, 0, 255));
+
+        // Limpieza de mallas
+        mapXSmall.delete(); mapYSmall.delete(); mapX.delete(); mapY.delete();
+    }
+
+    src.delete();
     // Cambiamos el estado de la interfaz
     panelRecorte.style.display = 'none';
     panelFiltros.style.display = 'flex';
