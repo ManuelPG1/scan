@@ -1,237 +1,293 @@
-/* Importamos tipografía moderna y limpia para interfaces (Inter) */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap');
 
-/* --- PALETA DE COLORES MODERNA (Dark Slate & Electric Blue) --- */
 :root {
-    --bg-main: #0f172a;       /* Fondo principal (Gris Pizarra muy oscuro) */
-    --bg-card: #1e293b;       /* Fondo de paneles (Gris Pizarra un poco más claro) */
-    --border-color: #334155;  /* Bordes sutiles */
-    --accent: #3b82f6;        /* Azul Eléctrico (Principal) */
-    --accent-hover: #2563eb;  /* Azul más oscuro para interacción */
-    --danger: #ef4444;        /* Rojo advertencia */
-    --danger-hover: #dc2626;
-    --text-main: #f8fafc;     /* Texto principal (Blanco roto) */
-    --text-muted: #94a3b8;    /* Texto secundario (Gris azulado) */
+    --bg-base: #0a0a0c;       /* Negro casi puro */
+    --bg-panel: #141417;      /* Carbón mate */
+    --bg-input: #1f1f24;      /* Superficie interactiva */
+    --border-dim: #2a2a35;    /* Bordes sutiles */
+    --border-bright: #444455;
+    --accent-green: #00fa9a;  /* Verde láser/escáner */
+    --accent-dim: rgba(0, 250, 154, 0.15);
+    --text-main: #e2e2e8;     /* Gris muy claro */
+    --text-muted: #8a8a98;    /* Texto secundario técnico */
+    --danger: #ff3366;        /* Rojo de advertencia */
 }
 
-/* --- ESTILOS GLOBALES --- */
 body {
-    background-color: var(--bg-main);
+    background-color: var(--bg-base);
     color: var(--text-main);
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Inter', sans-serif;
     margin: 0;
-    padding: 20px 15px;
+    padding: 15px;
     display: flex;
     flex-direction: column;
     align-items: center;
-    -webkit-font-smoothing: antialiased; /* Suaviza el texto en móviles */
+    /* Efecto de rejilla de calibración de fondo */
+    background-image:
+    linear-gradient(var(--border-dim) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border-dim) 1px, transparent 1px);
+    background-size: 30px 30px;
+    background-position: center;
+}
+
+/* --- CABECERA TÉCNICA --- */
+.app-header {
+    width: 100%;
+    max-width: 500px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--border-dim);
+    padding-bottom: 10px;
 }
 
 h2 {
-    font-weight: 700;
-    font-size: 1.5rem;
-    margin-top: 0;
-    margin-bottom: 20px;
-    letter-spacing: -0.025em;
-}
-
-h3 {
-    font-weight: 600;
+    font-family: 'Space Grotesk', monospace;
     font-size: 1.1rem;
     color: var(--text-muted);
-    margin-top: 0;
+    margin: 0;
+    letter-spacing: 1px;
+}
+
+.indicador-estado {
+    font-size: 0.7rem;
+    font-family: 'Space Grotesk', monospace;
+    color: var(--accent-green);
+    border: 1px solid var(--accent-green);
+    padding: 3px 8px;
+    border-radius: 2px;
+    letter-spacing: 1px;
+}
+
+/* --- VISOR DEL ESCÁNER --- */
+.visor-container {
+    width: 100%;
+    max-width: 500px;
+    background: #000;
+    border: 1px solid var(--border-bright);
+    margin-bottom: 15px;
+    position: relative;
+    /* Sombras duras para aspecto de hardware */
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+}
+
+#lienzoApp {
+width: 100%;
+height: auto;
+max-height: 60vh;
+display: block;
+touch-action: none;
+}
+
+/* --- PANELES DE CONTROL --- */
+.panel-control {
+    width: 100%;
+    max-width: 500px;
+    background: var(--bg-panel);
+    padding: 20px;
+    border: 1px solid var(--border-dim);
+    box-sizing: border-box;
     margin-bottom: 15px;
 }
 
-/* --- VISOR DEL ESCÁNER (Canvas) --- */
-#lienzoApp {
-max-width: 100%;
-height: auto;
-max-height: 65vh; /* Evita que ocupe toda la pantalla y oculte los botones */
-border: 1px solid var(--border-color);
-border-radius: 8px;
-background-color: #000; /* Fondo negro para que resalte la foto */
-box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
-touch-action: none;
-margin-bottom: 24px;
-}
-
-/* --- PANELES DE CONTROL (Tarjetas limpias) --- */
-.controles, .gestion-documento {
+.top-controls {
     width: 100%;
     max-width: 500px;
-    background: var(--bg-card);
-    padding: 24px 20px;
-    border-radius: 16px;
-    border: 1px solid var(--border-color);
-    box-sizing: border-box;
-    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
-    margin-bottom: 24px;
     display: flex;
-    flex-direction: column;
-    align-items: center;
+    gap: 10px;
+    margin-bottom: 15px;
 }
 
-/* --- BOTONES (Modernos y accesibles) --- */
+/* Textos Técnicos */
+.instruccion-tecnica, .titulo-seccion {
+    font-family: 'Space Grotesk', monospace;
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    margin-top: 0;
+    margin-bottom: 15px;
+    letter-spacing: 1px;
+}
+
+.contador-tech {
+    color: var(--accent-green);
+    font-size: 1.1rem;
+}
+
+/* --- BOTONES (Estilo Hardware) --- */
 button {
-    background-color: var(--accent);
-    color: #ffffff;
-    border: none;
-    border-radius: 10px;
-    padding: 16px 20px; /* Altura ideal para pantallas táctiles */
-    font-family: inherit;
-    font-weight: 600;
-    font-size: 1rem;
+    background-color: var(--bg-input);
+    color: var(--text-main);
+    border: 1px solid var(--border-bright);
+    border-radius: 2px; /* Esquinas casi afiladas */
+    padding: 14px 15px;
+    font-family: 'Space Grotesk', monospace;
+    font-size: 0.85rem;
+    letter-spacing: 1px;
     cursor: pointer;
-    transition: background-color 0.2s ease, transform 0.1s ease;
+    transition: all 0.15s ease;
     width: 100%;
-    margin: 6px 0;
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    gap: 8px; /* Espacio para iconos si los añades */
+    margin-bottom: 8px;
+    text-transform: uppercase;
 }
 
-/* Efecto al pulsar */
 button:active:not(:disabled) {
-    transform: scale(0.97);
+    transform: scale(0.98);
 }
 
 button:disabled {
-    background-color: #273447;
-    color: #64748b;
+    background-color: #0a0a0c;
+    color: #444;
+    border-color: #222;
     cursor: not-allowed;
 }
 
-#btnRotar {
-background-color: var(--bg-card);
-border: 1px solid var(--border-color);
-color: var(--text-main);
-width: auto;
-min-width: 65px;
-margin: 0;
+/* Botones Específicos */
+.btn-primary {
+    background-color: var(--accent-dim);
+    color: var(--accent-green);
+    border-color: var(--accent-green);
+}
+.btn-primary:active:not(:disabled) {
+    background-color: var(--accent-green);
+    color: #000;
 }
 
-#btnLimpiar {
-background-color: transparent;
-color: var(--danger);
-border: 1px solid var(--danger);
-margin-top: 15px;
-}
-
-#btnLimpiar:active:not(:disabled) {
-background-color: rgba(239, 68, 68, 0.1);
-}
-
-/* --- INPUTS, CHECKBOX Y SELECTORES --- */
-input[type="file"] {
-    font-size: 0.9rem;
+.btn-secondary {
+    background-color: transparent;
     color: var(--text-muted);
-    width: 100%;
 }
-/* Estilizar el feo botón por defecto del input file */
-input[type="file"]::file-selector-button {
-    background-color: var(--bg-card);
-    color: var(--text-main);
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    padding: 10px 16px;
-    margin-right: 15px;
-    cursor: pointer;
-    font-weight: 500;
-    transition: background-color 0.2s;
+.btn-secondary:active {
+    background-color: var(--border-dim);
 }
 
-label {
-    font-size: 1rem;
-    margin-bottom: 15px;
+.btn-danger {
+    background-color: transparent;
+    color: var(--danger);
+    border-color: #4a1a24;
+    margin-top: 20px;
+}
+.btn-danger:active {
+    background-color: var(--danger);
+    color: #fff;
+}
+
+.btn-icon {
+    width: auto;
+    min-width: 60px;
+    margin-bottom: 0;
+}
+
+/* Corrección del Flexbox para los botones del filtro */
+.btn-group {
+    display: flex;
+    gap: 10px;
     width: 100%;
+}
+.btn-group button {
+    flex: 1;
+    margin-bottom: 0;
+    min-width: 0; /* ESTO ARREGLA EL FALLO DEL OVERFLOW */
+}
+
+/* --- INPUTS Y FORMULARIOS --- */
+input[type="file"] {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-family: 'Space Grotesk', monospace;
+    width: 100%;
+}
+input[type="file"]::file-selector-button {
+    background-color: var(--bg-input);
+    color: var(--text-main);
+    border: 1px solid var(--border-bright);
+    border-radius: 2px;
+    padding: 10px 15px;
+    margin-right: 15px;
+    font-family: inherit;
+    cursor: pointer;
+    text-transform: uppercase;
+}
+
+.parametro-control {
+    margin-bottom: 20px;
+    width: 100%;
+}
+.parametro-control label {
+    font-family: 'Space Grotesk', monospace;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    display: block;
+    margin-bottom: 10px;
+}
+
+/* Custom Checkbox Tech */
+.toggle-tecnico {
     display: flex;
     align-items: center;
-    gap: 10px;
+    gap: 12px;
+    font-family: 'Space Grotesk', monospace;
+    font-size: 0.9rem;
     color: var(--text-main);
+    margin-bottom: 20px;
+    cursor: pointer;
+}
+.toggle-tecnico input {
+    accent-color: var(--accent-green);
+    width: 18px;
+    height: 18px;
 }
 
-select {
-    background-color: var(--bg-main);
-    color: var(--text-main);
-    padding: 12px 16px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    font-family: inherit;
-    font-size: 0.95rem;
+/* Slider Tech */
+input[type="range"] {
     width: 100%;
-    box-sizing: border-box;
-    appearance: none; /* Limpia la flecha nativa en algunos móviles */
+    accent-color: var(--accent-green);
+    background: transparent;
+}
+
+select.input-tecnico {
+    background-color: var(--bg-input);
+    color: var(--accent-green);
+    border: 1px solid var(--border-bright);
+    padding: 12px;
+    border-radius: 2px;
+    font-family: 'Space Grotesk', monospace;
+    font-size: 0.85rem;
+    width: 100%;
     outline: none;
 }
-select:focus {
-    border-color: var(--accent);
-}
 
-/* --- ÁREA DE MINIATURAS (Galería de páginas) --- */
-#vistasPrevias {
-display: flex;
-gap: 12px;
-justify-content: flex-start;
-overflow-x: auto;
-padding: 15px 5px 25px 5px; /* Espacio inferior para los botones de borrar */
-width: 100%;
-box-sizing: border-box;
-margin-bottom: 10px;
+/* --- GALERÍA DE LOTE (Miniaturas) --- */
+.galeria-lote {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    padding: 10px 5px 20px 5px;
+    margin-bottom: 15px;
+    border-bottom: 1px dashed var(--border-dim);
 }
-
-/* Ocultar barra de scroll en móviles para que quede más limpio */
-#vistasPrevias::-webkit-scrollbar {
-display: none;
+.galeria-lote::-webkit-scrollbar {
+    height: 4px;
 }
-
-.miniatura-wrapper {
-    position: relative;
-    flex: 0 0 auto;
-    cursor: grab;
-    transition: transform 0.2s;
-}
-
-.miniatura-wrapper:active {
-    cursor: grabbing;
+.galeria-lote::-webkit-scrollbar-thumb {
+    background: var(--border-bright);
 }
 
 .miniatura-wrapper img {
-    height: 130px;
-    border: 2px solid var(--border-color);
-    border-radius: 6px;
-    object-fit: cover;
+    height: 120px;
+    border: 1px solid var(--border-bright);
+    border-radius: 0; /* Cuadrado fotográfico */
+    filter: grayscale(20%); /* Tono sutil */
 }
 
-/* El botón de borrar cada página (Más limpio y sutil) */
 .btn-eliminar-pag {
-    position: absolute;
-    top: -10px;
-    right: -10px;
-    background-color: var(--danger);
-    color: white;
-    border: none;
-    border-radius: 50%;
-    width: 26px;
-    height: 26px;
-    font-size: 16px;
-    font-weight: bold;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.5);
-    margin: 0;
-}
-
-/* --- RESPONSIVE --- */
-@media (min-width: 600px) {
-    button {
-        width: auto;
-        min-width: 250px;
-    }
-    .controles, .gestion-documento {
-        padding: 32px;
-    }
+    background-color: var(--bg-base);
+    color: var(--danger);
+    border: 1px solid var(--danger);
+    border-radius: 0;
+    width: 24px;
+    height: 24px;
+    top: -8px;
+    right: -8px;
+    font-family: monospace;
 }
