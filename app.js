@@ -437,19 +437,27 @@ function base64ToBlob(base64, mimeType) {
     return new Blob([ab], { type: mimeType });
 }
 
-// NUEVO: Descarga a prueba de PWAs (Convierte el Blob a Base64 nativo)
+// NUEVO: Descarga Síncrona 100% compatible con Firefox PWA y Chrome
 function descargarPwaSeguro(blob, nombreArchivo) {
-    const reader = new FileReader();
-    reader.onloadend = function() {
-        const enlace = document.createElement('a');
-        enlace.style.display = 'none';
-        enlace.href = reader.result; // Data URI, 100% compatible con Gestor de Descargas Android
-        enlace.download = nombreArchivo;
-        document.body.appendChild(enlace);
-        enlace.click();
-        setTimeout(() => document.body.removeChild(enlace), 100);
-    };
-    reader.readAsDataURL(blob);
+    // 1. Creamos un enlace directo a la memoria (Síncrono e instantáneo)
+    const url = window.URL.createObjectURL(blob);
+
+    // 2. Creamos el botón invisible
+    const enlace = document.createElement('a');
+    enlace.style.display = 'none';
+    enlace.href = url;
+    enlace.download = nombreArchivo;
+
+    // 3. Lo pegamos y lo clicamos en el mismo ciclo de ejecución
+    document.body.appendChild(enlace);
+    enlace.click();
+
+    // 4. Le damos 1 segundo de margen a Firefox para que intercepte la
+    // descarga antes de borrar el archivo de la memoria temporal
+    setTimeout(() => {
+        document.body.removeChild(enlace);
+        window.URL.revokeObjectURL(url);
+    }, 1000);
 }
 
 // 2. COMPARTIR IMAGEN
@@ -567,19 +575,6 @@ btnLimpiar.addEventListener('click', () => {
     }
 });
 
-// 4. Reiniciar el estado por completo
-btnLimpiar.addEventListener('click', () => {
-    if (confirm("¿Seguro que quieres borrar todas las páginas guardadas?")) {
-        listaPaginas = [];
-        imagenActualBase64 = null;
-        contadorPaginas.textContent = "0";
-        vistasPrevias.innerHTML = "";
-        btnCompartirPDF.disabled = true;
-        btnGuardarPagina.disabled = true;
-        btnCompartirImagen.disabled = true;
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-    }
-});
 
 const btnRotar = document.getElementById('btnRotar');
 
