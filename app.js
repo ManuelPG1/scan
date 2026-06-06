@@ -10,6 +10,28 @@ if ('serviceWorker' in navigator) {
     });
 }
 
+// --- SISTEMA DE NAVEGACIÓN (SPA) ---
+const tabEscaner = document.getElementById('tabEscaner');
+const tabPdf = document.getElementById('tabPdf');
+const moduloEscaner = document.getElementById('modulo-escaner');
+const moduloPdf = document.getElementById('modulo-pdf');
+
+tabEscaner.addEventListener('click', () => {
+    tabEscaner.classList.add('tab-activo');
+    tabPdf.classList.remove('tab-activo');
+    moduloEscaner.style.display = 'block';
+    moduloPdf.style.display = 'none';
+});
+
+tabPdf.addEventListener('click', () => {
+    tabPdf.classList.add('tab-activo');
+    tabEscaner.classList.remove('tab-activo');
+    moduloPdf.style.display = 'block';
+    moduloEscaner.style.display = 'none';
+});
+
+/////////////////7
+
 let colaArchivos = [];
 
 const inputImagen = document.getElementById('inputImagen');
