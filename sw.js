@@ -1,29 +1,68 @@
-// Asignamos un nombre y versión a la caché
-const CACHE_NAME = 'aethel-escaner-v1';
+const CACHE_NAME = 'escaner-v2';
 
-const urlsToCache = [
+const ASSETS = [
   './',
-  './index.html',
-  './estilos.css',
-  './app.js',
-  './manifest.json'
+'./index.html',
+'./estilos.css',
+'./app.js',
+'./manifest.json'
 ];
 
 self.addEventListener('install', event => {
+  self.skipWaiting();
+
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(cache => {
-        return cache.addAll(urlsToCache);
-      })
+    .then(cache => cache.addAll(ASSETS))
+  );
+});
+
+self.addEventListener('activate', event => {
+  event.waitUntil(
+    Promise.all([
+      self.clients.claim(),
+
+                caches.keys().then(keys =>
+                Promise.all(
+                  keys
+                  .filter(key => key !== CACHE_NAME)
+                  .map(key => caches.delete(key))
+                )
+                )
+    ])
   );
 });
 
 self.addEventListener('fetch', event => {
+
+  if (event.request.method !== 'GET') {
+    return;
+  }
+
   event.respondWith(
     caches.match(event.request)
-      .then(response => {
-        // Si el archivo está en caché, lo devuelve. Si no, lo busca en internet.
-        return response || fetch(event.request);
-      })
+    .then(cachedResponse => {
+
+      if (cachedResponse) {
+        return cachedResponse;
+      }
+
+      return fetch(event.request)
+      .then(networkResponse => {
+
+        if (
+          networkResponse &&
+          networkResponse.status === 200 &&
+          networkResponse.type === 'basic'
+        ) {
+          const responseClone = networkResponse.clone();
+
+          caches.open(CACHE_NAME)
+          .then(cache => cache.put(event.request, responseClone));
+        }
+
+        return networkResponse;
+      });
+    })
   );
 });
