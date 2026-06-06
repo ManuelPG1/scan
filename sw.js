@@ -1,4 +1,4 @@
-const CACHE_NAME = 'escaner-v3.1';
+const CACHE_NAME = 'escaner-v4';
 
 const ASSETS = [
   './',
@@ -8,6 +8,7 @@ const ASSETS = [
 './manifest.json'
 './icono-192.png'
 './icono-512.png'
+'./herramientas-pdf.js',
 ];
 
 self.addEventListener('install', event => {
