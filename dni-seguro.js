@@ -13,7 +13,12 @@ const comboCaraDni = document.getElementById('comboCaraDni');
 const contenedorCensura = document.getElementById('contenedorCensura');
 const inputMotivoDni = document.getElementById('inputMotivoDni');
 const inputFechaDni = document.getElementById('inputFechaDni');
-const btnDescargarDni = document.getElementById('btnDescargarDni');
+
+const btnDescargarDniJpg = document.getElementById('btnDescargarDniJpg');
+const btnDescargarDniPdf = document.getElementById('btnDescargarDniPdf');
+let blobDniGeneradoJpg = null;
+let blobDniGeneradoPdf = null;
+
 const btnRotarDni = document.getElementById('btnRotarDni');
 const checkBnDni = document.getElementById('checkBnDni');
 const checkEscanerDni = document.getElementById('checkEscanerDni');
@@ -518,36 +523,87 @@ function renderizarDniSeguro() {
         }
         ctxDni.restore();
     }
+    // Reiniciar botones de descarga si han hecho cambios
+    btnDescargarDniJpg.innerText = "EXPORTAR (JPG)";
+    btnDescargarDniJpg.style.backgroundColor = "";
+    btnDescargarDniJpg.style.color = "";
+    blobDniGeneradoJpg = null;
 
-    btnDescargarDni.innerText = "EXPORTAR DNI SEGURO";
-    btnDescargarDni.style.backgroundColor = "";
-    btnDescargarDni.style.color = "";
+    btnDescargarDniPdf.innerText = "EXPORTAR (PDF)";
+    btnDescargarDniPdf.style.backgroundColor = "";
+    btnDescargarDniPdf.style.color = "";
+    blobDniGeneradoPdf = null;
 }
 
 // --- 5. EXPORTAR EL RESULTADO ---
 let blobDniGenerado = null;
 
-btnDescargarDni.addEventListener('click', async () => {
-    // Fase 2: Compartir
-    if (blobDniGenerado && btnDescargarDni.innerText.includes("TOCAR PARA COMPARTIR")) {
-        const nombreDni = `dni_seguro_${Date.now()}.jpg`;
-        if (typeof compartirOpcionalPwa === 'function') {
-            compartirOpcionalPwa(blobDniGenerado, nombreDni);
-        } else if (typeof descargarPwaSeguro === 'function') {
-            descargarPwaSeguro(blobDniGenerado, nombreDni);
-        }
+// --- 5. EXPORTAR EL RESULTADO (JPG y PDF) ---
+
+// Motor JPG
+btnDescargarDniJpg.addEventListener('click', async () => {
+    if (blobDniGeneradoJpg && btnDescargarDniJpg.innerText.includes("COMPARTIR")) {
+        const nombreDniJpg = `dni_seguro_${Date.now()}.jpg`;
+        if (typeof compartirOpcionalPwa === 'function') compartirOpcionalPwa(blobDniGeneradoJpg, nombreDniJpg);
+        else if (typeof descargarPwaSeguro === 'function') descargarPwaSeguro(blobDniGeneradoJpg, nombreDniJpg);
         return;
     }
 
-    // Fase 1: Procesar
-    btnDescargarDni.innerText = "GENERANDO... ⏳";
-    btnDescargarDni.disabled = true;
+    btnDescargarDniJpg.innerText = "GENERANDO... ⏳";
+    btnDescargarDniJpg.disabled = true;
 
     canvasDni.toBlob((blob) => {
-        blobDniGenerado = blob;
-        btnDescargarDni.innerText = "📤 ¡LISTO! TOCAR PARA COMPARTIR";
-        btnDescargarDni.style.backgroundColor = "var(--accent-green)";
-        btnDescargarDni.style.color = "#000";
-        btnDescargarDni.disabled = false;
+        blobDniGeneradoJpg = blob;
+        btnDescargarDniJpg.innerText = "📤 ¡LISTO! COMPARTIR";
+        btnDescargarDniJpg.style.backgroundColor = "var(--accent-green)";
+        btnDescargarDniJpg.style.color = "#000";
+        btnDescargarDniJpg.disabled = false;
+    }, 'image/jpeg', 0.9);
+});
+
+// Motor PDF (Envuelve el JPG en un documento PDF ajustado)
+btnDescargarDniPdf.addEventListener('click', async () => {
+    if (blobDniGeneradoPdf && btnDescargarDniPdf.innerText.includes("COMPARTIR")) {
+        const nombreDniPdf = `dni_seguro_${Date.now()}.pdf`;
+        if (typeof compartirOpcionalPwa === 'function') compartirOpcionalPwa(blobDniGeneradoPdf, nombreDniPdf);
+        else if (typeof descargarPwaSeguro === 'function') descargarPwaSeguro(blobDniGeneradoPdf, nombreDniPdf);
+        return;
+    }
+
+    btnDescargarDniPdf.innerText = "GENERANDO... ⏳";
+    btnDescargarDniPdf.disabled = true;
+
+    // Primero sacamos la imagen del canvas
+    canvasDni.toBlob(async (blob) => {
+        try {
+            const arrayBuffer = await blob.arrayBuffer();
+            const { PDFDocument } = PDFLib;
+
+            // Creamos un PDF e incrustamos la imagen
+            const pdfDoc = await PDFDocument.create();
+            const imagenAIncrustar = await pdfDoc.embedJpg(arrayBuffer);
+
+            // Creamos una página con el tamaño exacto del DNI
+            const pagina = pdfDoc.addPage([imagenAIncrustar.width, imagenAIncrustar.height]);
+            pagina.drawImage(imagenAIncrustar, {
+                x: 0,
+                y: 0,
+                width: imagenAIncrustar.width,
+                height: imagenAIncrustar.height
+            });
+
+            const pdfBytes = await pdfDoc.save();
+            blobDniGeneradoPdf = new Blob([pdfBytes], { type: 'application/pdf' });
+
+            btnDescargarDniPdf.innerText = "📤 ¡LISTO! COMPARTIR";
+            btnDescargarDniPdf.style.backgroundColor = "var(--accent-green)";
+            btnDescargarDniPdf.style.color = "#000";
+            btnDescargarDniPdf.disabled = false;
+
+        } catch (error) {
+            alert("Error al generar el PDF del DNI.");
+            btnDescargarDniPdf.innerText = "EXPORTAR (PDF)";
+            btnDescargarDniPdf.disabled = false;
+        }
     }, 'image/jpeg', 0.9);
 });
