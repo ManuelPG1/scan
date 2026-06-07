@@ -1,19 +1,50 @@
 // ==========================================
+// FUNCIÓN UNIVERSAL DE COMPARTIR (PDF LAB)
+// ==========================================
+async function compartirOpcionalPwa(blob, nombreArchivo) {
+    const archivo = new File([blob], nombreArchivo, { type: 'application/pdf' });
+
+    if (navigator.canShare && navigator.canShare({ files: [archivo] })) {
+        try {
+            await navigator.share({ files: [archivo], title: 'Documento PDF' });
+        } catch (error) {
+            // Si el móvil bloquea el menú o falla, forzamos descarga segura
+            if (error.name !== 'AbortError' && typeof descargarPwaSeguro === 'function') {
+                descargarPwaSeguro(blob, nombreArchivo);
+            }
+        }
+    } else {
+        // Fallback para PC o Firefox
+        if (typeof descargarPwaSeguro === 'function') descargarPwaSeguro(blob, nombreArchivo);
+    }
+}
+
+
+// ==========================================
 // HERRAMIENTA 01: FUSIÓN DE PDFS (CON ORDENACIÓN)
 // ==========================================
 const inputPdfs = document.getElementById('inputPdfs');
 const listaPdfsUnir = document.getElementById('listaPdfsUnir');
 const btnUnirPdfs = document.getElementById('btnUnirPdfs');
 
-// Ahora guardamos objetos con un ID único para poder arrastrarlos sin perder la referencia del archivo
 let lotePdfsParaUnir = [];
 let elementoPdfArrastrado = null;
+
+// Variables de estado para el botón Compartir
+let pdfFusionadoBlob = null;
+let nombrePdfFusionado = null;
+
+function resetearBotonUnir() {
+    pdfFusionadoBlob = null;
+    btnUnirPdfs.innerText = "PROCESAR Y UNIR PDFS";
+    btnUnirPdfs.style.backgroundColor = "";
+    btnUnirPdfs.style.color = "";
+}
 
 inputPdfs.addEventListener('change', (e) => {
     const nuevosArchivos = Array.from(e.target.files);
     if (nuevosArchivos.length === 0) return;
 
-    // Convertimos cada archivo en un objeto con ID
     nuevosArchivos.forEach(archivo => {
         lotePdfsParaUnir.push({
             id: 'pdf_' + Date.now() + Math.random().toString(36).substring(2),
@@ -23,12 +54,13 @@ inputPdfs.addEventListener('change', (e) => {
 
     e.target.value = '';
     actualizarInterfazLotePdfs();
+    resetearBotonUnir();
 });
 
-// Sincroniza el array interno con el orden visual tras soltar un elemento
 function sincronizarOrdenPdfs() {
     const ordenVisualIds = Array.from(listaPdfsUnir.children).map(div => div.dataset.id);
     lotePdfsParaUnir.sort((a, b) => ordenVisualIds.indexOf(a.id) - ordenVisualIds.indexOf(b.id));
+    resetearBotonUnir(); // Si cambian el orden, obligamos a volver a procesar
 }
 
 function actualizarInterfazLotePdfs() {
@@ -37,9 +69,8 @@ function actualizarInterfazLotePdfs() {
     lotePdfsParaUnir.forEach((item, index) => {
         const itemDiv = document.createElement('div');
         itemDiv.dataset.id = item.id;
-        itemDiv.draggable = true; // Lo hacemos arrastrable
+        itemDiv.draggable = true;
 
-        // Estilos técnicos
         itemDiv.style.display = 'flex';
         itemDiv.style.justifyContent = 'space-between';
         itemDiv.style.alignItems = 'center';
@@ -50,9 +81,7 @@ function actualizarInterfazLotePdfs() {
         itemDiv.style.fontFamily = "'Space Grotesk', monospace";
         itemDiv.style.fontSize = '0.75rem';
         itemDiv.style.cursor = 'grab';
-        itemDiv.style.transition = 'transform 0.2s, opacity 0.2s';
 
-        // Lógica Drag & Drop
         itemDiv.addEventListener('dragstart', () => {
             elementoPdfArrastrado = itemDiv;
             itemDiv.style.opacity = '0.4';
@@ -63,7 +92,7 @@ function actualizarInterfazLotePdfs() {
             itemDiv.style.opacity = '1';
             itemDiv.style.cursor = 'grab';
             elementoPdfArrastrado = null;
-            sincronizarOrdenPdfs(); // Reordenamos el array interno
+            sincronizarOrdenPdfs();
         });
 
         const nombreSpan = document.createElement('span');
@@ -82,6 +111,7 @@ function actualizarInterfazLotePdfs() {
         btnQuitar.onclick = () => {
             lotePdfsParaUnir = lotePdfsParaUnir.filter(p => p.id !== item.id);
             actualizarInterfazLotePdfs();
+            resetearBotonUnir();
         };
 
         itemDiv.appendChild(nombreSpan);
@@ -92,12 +122,10 @@ function actualizarInterfazLotePdfs() {
     btnUnirPdfs.disabled = lotePdfsParaUnir.length < 2;
 }
 
-// Zona de caída (Drop Zone) vertical
 listaPdfsUnir.addEventListener('dragover', (e) => {
     e.preventDefault();
     const elementosArrastrables = [...listaPdfsUnir.querySelectorAll('div:not([style*="opacity: 0.4"])')];
 
-    // Calculamos si el ratón está por encima o por debajo de la mitad del elemento
     const elementoSiguiente = elementosArrastrables.find(hijo => {
         const caja = hijo.getBoundingClientRect();
         return e.clientY <= caja.top + caja.height / 2;
@@ -112,9 +140,16 @@ listaPdfsUnir.addEventListener('dragover', (e) => {
     }
 });
 
-// Motor de Fusión
 btnUnirPdfs.addEventListener('click', async () => {
     if (lotePdfsParaUnir.length < 2) return;
+
+    // PASO 2: Si ya está generado, compartimos al instante
+    if (pdfFusionadoBlob) {
+        compartirOpcionalPwa(pdfFusionadoBlob, nombrePdfFusionado);
+        return;
+    }
+
+    // PASO 1: Procesar y Generar
     const textoOriginal = btnUnirPdfs.innerText;
     btnUnirPdfs.innerText = "PROCESANDO FUSIÓN... ⏳";
     btnUnirPdfs.disabled = true;
@@ -134,13 +169,13 @@ btnUnirPdfs.addEventListener('click', async () => {
         }
 
         const bytesPdfFinal = await pdfFinal.save();
-        const blobPdf = new Blob([bytesPdfFinal], { type: 'application/pdf' });
+        pdfFusionadoBlob = new Blob([bytesPdfFinal], { type: 'application/pdf' });
+        nombrePdfFusionado = `fusion_${Date.now()}.pdf`;
 
-        if (typeof descargarPwaSeguro === 'function') {
-            descargarPwaSeguro(blobPdf, `fusion_${Date.now()}.pdf`);
-        }
-
-        btnUnirPdfs.innerText = textoOriginal;
+        // Transformar botón para compartir
+        btnUnirPdfs.innerText = "📤 ¡LISTO! TOCAR PARA COMPARTIR";
+        btnUnirPdfs.style.backgroundColor = "var(--accent-green)";
+        btnUnirPdfs.style.color = "#000";
         btnUnirPdfs.disabled = false;
 
     } catch (error) {
@@ -162,11 +197,24 @@ const btnSepararPdf = document.getElementById('btnSepararPdf');
 let pdfAExtraer = null;
 let totalPaginasExtraer = 0;
 
-// Cargar el PDF para ver cuántas páginas tiene
+let pdfExtraidoBlob = null;
+let nombrePdfExtraido = null;
+
+function resetearBotonSeparar() {
+    pdfExtraidoBlob = null;
+    btnSepararPdf.innerText = "EXTRAER A NUEVO PDF";
+    btnSepararPdf.style.backgroundColor = "";
+    btnSepararPdf.style.color = "";
+}
+
+// Si el usuario escribe un nuevo número, hay que generar un PDF nuevo
+inputRangoPaginas.addEventListener('input', resetearBotonSeparar);
+
 inputPdfSeparar.addEventListener('change', async (e) => {
     const archivo = e.target.files[0];
     if (!archivo) return;
 
+    resetearBotonSeparar();
     infoPdfSeparar.textContent = "Analizando documento... ⏳";
 
     try {
@@ -177,46 +225,43 @@ inputPdfSeparar.addEventListener('change', async (e) => {
         totalPaginasExtraer = pdfAExtraer.getPageCount();
 
         infoPdfSeparar.textContent = `DOCUMENTO CARGADO: ${totalPaginasExtraer} PÁGINAS DETECTADAS.`;
-
-        // Habilitamos los controles
         inputRangoPaginas.disabled = false;
         inputRangoPaginas.style.borderColor = "var(--accent-green)";
         btnSepararPdf.disabled = false;
-
     } catch (error) {
         infoPdfSeparar.textContent = "[ ERROR AL LEER EL DOCUMENTO ]";
         infoPdfSeparar.style.color = "var(--danger)";
     }
 });
 
-// Función inteligente para entender comandos de texto como "1, 3, 5-8"
 function parsearRango(rangoStr, maxPaginas) {
     let paginas = new Set();
-    // Quitamos espacios y separamos por comas
     let partes = rangoStr.replace(/\s+/g, '').split(',');
 
     for (let p of partes) {
         if (p.includes('-')) {
-            // Es un rango (ej: 4-6)
             let [inicio, fin] = p.split('-').map(Number);
             if (inicio && fin && inicio <= fin) {
                 for (let i = inicio; i <= fin; i++) {
-                    if (i >= 1 && i <= maxPaginas) paginas.add(i - 1); // Restamos 1 porque pdf-lib cuenta desde 0
+                    if (i >= 1 && i <= maxPaginas) paginas.add(i - 1);
                 }
             }
         } else {
-            // Es un número suelto (ej: 3)
             let num = Number(p);
             if (num >= 1 && num <= maxPaginas) paginas.add(num - 1);
         }
     }
-    // Devolvemos el array ordenado
     return Array.from(paginas).sort((a, b) => a - b);
 }
 
-// Motor de Extracción
 btnSepararPdf.addEventListener('click', async () => {
     if (!pdfAExtraer) return;
+
+    // PASO 2: Compartir al instante
+    if (pdfExtraidoBlob) {
+        compartirOpcionalPwa(pdfExtraidoBlob, nombrePdfExtraido);
+        return;
+    }
 
     const rangoUsuario = inputRangoPaginas.value.trim();
     if (rangoUsuario === "") {
@@ -225,12 +270,12 @@ btnSepararPdf.addEventListener('click', async () => {
     }
 
     const indicesAExtraer = parsearRango(rangoUsuario, totalPaginasExtraer);
-
     if (indicesAExtraer.length === 0) {
         alert("SISTEMA: Rango inválido o fuera de los límites del documento.");
         return;
     }
 
+    // PASO 1: Procesar
     const textoOriginal = btnSepararPdf.innerText;
     btnSepararPdf.innerText = "EXTRAYENDO PÁGINAS... ⏳";
     btnSepararPdf.disabled = true;
@@ -239,20 +284,18 @@ btnSepararPdf.addEventListener('click', async () => {
         const { PDFDocument } = PDFLib;
         const pdfFinal = await PDFDocument.create();
 
-        // Copiamos solo las páginas que el usuario ha pedido
         const paginasCopiadas = await pdfFinal.copyPages(pdfAExtraer, indicesAExtraer);
         for (const pagina of paginasCopiadas) {
             pdfFinal.addPage(pagina);
         }
 
         const bytesPdfFinal = await pdfFinal.save();
-        const blobPdf = new Blob([bytesPdfFinal], { type: 'application/pdf' });
+        pdfExtraidoBlob = new Blob([bytesPdfFinal], { type: 'application/pdf' });
+        nombrePdfExtraido = `extraccion_${Date.now()}.pdf`;
 
-        if (typeof descargarPwaSeguro === 'function') {
-            descargarPwaSeguro(blobPdf, `extraccion_${Date.now()}.pdf`);
-        }
-
-        btnSepararPdf.innerText = textoOriginal;
+        btnSepararPdf.innerText = "📤 ¡LISTO! TOCAR PARA COMPARTIR";
+        btnSepararPdf.style.backgroundColor = "var(--accent-green)";
+        btnSepararPdf.style.color = "#000";
         btnSepararPdf.disabled = false;
 
     } catch (error) {
@@ -262,6 +305,7 @@ btnSepararPdf.addEventListener('click', async () => {
     }
 });
 
+
 // ==========================================
 // HERRAMIENTA 03: EDICIÓN VISUAL (ROTAR / ELIMINAR)
 // ==========================================
@@ -270,16 +314,26 @@ const infoPdfEditar = document.getElementById('infoPdfEditar');
 const galeriaEdicionPdf = document.getElementById('galeriaEdicionPdf');
 const btnGuardarEdicionPdf = document.getElementById('btnGuardarEdicionPdf');
 
-// Configuramos la ruta del Worker de PDF.js (necesario para que no bloquee el móvil)
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-let pdfDocEdicionLib = null; // El documento matemático original
-let estadoPaginasPdf = [];   // Guardaremos qué le hacemos a cada página
+let pdfDocEdicionLib = null;
+let estadoPaginasPdf = [];
+
+let pdfEditadoBlob = null;
+let nombrePdfEditado = null;
+
+function resetearBotonEdicion() {
+    pdfEditadoBlob = null;
+    btnGuardarEdicionPdf.innerText = "APLICAR CAMBIOS Y GUARDAR";
+    btnGuardarEdicionPdf.style.backgroundColor = "";
+    btnGuardarEdicionPdf.style.color = "";
+}
 
 inputPdfEditar.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    resetearBotonEdicion();
     infoPdfEditar.textContent = "Renderizando vista de rayos X... ⏳";
     galeriaEdicionPdf.innerHTML = '';
     galeriaEdicionPdf.style.display = 'flex';
@@ -288,29 +342,21 @@ inputPdfEditar.addEventListener('change', async (e) => {
 
     try {
         const arrayBuffer = await file.arrayBuffer();
-
-        // 1. Cargamos el PDF con pdf-lib para la exportación final
         pdfDocEdicionLib = await PDFLib.PDFDocument.load(arrayBuffer);
 
-        // 2. Cargamos el PDF con pdf.js para generar la vista previa
         const loadingTask = pdfjsLib.getDocument({data: arrayBuffer});
         const pdfVisual = await loadingTask.promise;
 
         estadoPaginasPdf = [];
 
-        // 3. Renderizamos cada página
         for (let i = 1; i <= pdfVisual.numPages; i++) {
-            // Guardamos el estado base de esta página (0 grados, no borrada)
             estadoPaginasPdf.push({ index: i - 1, rotacion: 0, borrada: false });
 
             const pagina = await pdfVisual.getPage(i);
-
-            // Calculamos la escala para que todas las miniaturas tengan 120px de ancho
             const viewportOriginal = pagina.getViewport({ scale: 1 });
             const escala = 120 / viewportOriginal.width;
             const viewport = pagina.getViewport({ scale: escala });
 
-            // Contenedor principal de la página
             const wrapper = document.createElement('div');
             wrapper.style.display = 'flex';
             wrapper.style.flexDirection = 'column';
@@ -319,7 +365,6 @@ inputPdfEditar.addEventListener('change', async (e) => {
             wrapper.style.margin = '0 10px';
             wrapper.style.transition = 'all 0.3s ease';
 
-            // Canvas de la miniatura
             const canvas = document.createElement('canvas');
             const ctx = canvas.getContext('2d');
             canvas.height = viewport.height;
@@ -327,29 +372,26 @@ inputPdfEditar.addEventListener('change', async (e) => {
             canvas.style.border = '1px solid var(--border-bright)';
             canvas.style.transition = 'transform 0.3s ease';
 
-            // Renderizado nativo
             const renderContext = { canvasContext: ctx, viewport: viewport };
             await pagina.render(renderContext).promise;
 
-            // Panel de botones de la miniatura
             const panelControles = document.createElement('div');
             panelControles.style.display = 'flex';
             panelControles.style.gap = '5px';
             panelControles.style.marginTop = '10px';
 
-            // Botón Rotar
             const btnRotar = document.createElement('button');
             btnRotar.textContent = '↻ 90º';
             btnRotar.style.padding = '5px';
             btnRotar.style.margin = '0';
             btnRotar.style.width = 'auto';
             btnRotar.onclick = () => {
+                resetearBotonEdicion(); // Si se gira, se borra el PDF previo
                 const estado = estadoPaginasPdf[i-1];
                 estado.rotacion = (estado.rotacion + 90) % 360;
                 canvas.style.transform = `rotate(${estado.rotacion}deg)`;
             };
 
-            // Botón Borrar
             const btnBorrar = document.createElement('button');
             btnBorrar.textContent = 'X';
             btnBorrar.style.color = 'var(--danger)';
@@ -359,6 +401,7 @@ inputPdfEditar.addEventListener('change', async (e) => {
             btnBorrar.style.margin = '0';
             btnBorrar.style.width = 'auto';
             btnBorrar.onclick = () => {
+                resetearBotonEdicion(); // Si se borra algo, se descarta el PDF previo
                 const estado = estadoPaginasPdf[i-1];
                 estado.borrada = !estado.borrada;
 
@@ -386,14 +429,19 @@ inputPdfEditar.addEventListener('change', async (e) => {
         btnGuardarEdicionPdf.disabled = false;
 
     } catch (error) {
-        console.error(error);
         infoPdfEditar.textContent = "[ ERROR AL LEER EL DOCUMENTO ]";
         infoPdfEditar.style.color = "var(--danger)";
     }
 });
 
-// Guardar los cambios físicos en el PDF
 btnGuardarEdicionPdf.addEventListener('click', async () => {
+    // PASO 2
+    if (pdfEditadoBlob) {
+        compartirOpcionalPwa(pdfEditadoBlob, nombrePdfEditado);
+        return;
+    }
+
+    // PASO 1
     const textoOriginal = btnGuardarEdicionPdf.innerText;
     btnGuardarEdicionPdf.innerText = "PROCESANDO CAMBIOS... ⏳";
     btnGuardarEdicionPdf.disabled = true;
@@ -405,11 +453,9 @@ btnGuardarEdicionPdf.addEventListener('click', async () => {
         for (let i = 0; i < estadoPaginasPdf.length; i++) {
             const estado = estadoPaginasPdf[i];
 
-            // Si la página no ha sido marcada para borrar, la copiamos
             if (!estado.borrada) {
                 const [paginaCopiada] = await pdfFinal.copyPages(pdfDocEdicionLib, [estado.index]);
 
-                // Si el usuario la giró en la vista previa, aplicamos los grados matemáticamente
                 if (estado.rotacion !== 0) {
                     const rotacionActual = paginaCopiada.getRotation().angle;
                     paginaCopiada.setRotation(degrees(rotacionActual + estado.rotacion));
@@ -420,13 +466,12 @@ btnGuardarEdicionPdf.addEventListener('click', async () => {
         }
 
         const bytesPdfFinal = await pdfFinal.save();
-        const blobPdf = new Blob([bytesPdfFinal], { type: 'application/pdf' });
+        pdfEditadoBlob = new Blob([bytesPdfFinal], { type: 'application/pdf' });
+        nombrePdfEditado = `documento_editado_${Date.now()}.pdf`;
 
-        if (typeof descargarPwaSeguro === 'function') {
-            descargarPwaSeguro(blobPdf, `documento_editado_${Date.now()}.pdf`);
-        }
-
-        btnGuardarEdicionPdf.innerText = textoOriginal;
+        btnGuardarEdicionPdf.innerText = "📤 ¡LISTO! TOCAR PARA COMPARTIR";
+        btnGuardarEdicionPdf.style.backgroundColor = "var(--accent-green)";
+        btnGuardarEdicionPdf.style.color = "#000";
         btnGuardarEdicionPdf.disabled = false;
 
     } catch (error) {
@@ -449,26 +494,36 @@ const btnAplicarMarcas = document.getElementById('btnAplicarMarcas');
 let pdfParaMarcasOriginal = null;
 let totalPaginasMarcas = 0;
 
-// 1. Cargar el PDF en memoria
+let pdfMarcasBlob = null;
+let nombrePdfMarcas = null;
+
+function resetearBotonMarcas() {
+    pdfMarcasBlob = null;
+    btnAplicarMarcas.innerText = "ESTAMPAR DOCUMENTO";
+    btnAplicarMarcas.style.backgroundColor = "";
+    btnAplicarMarcas.style.color = "";
+}
+
+// Si escribe texto o activa el check, invalidamos el PDF anterior
+inputMarcaAgua.addEventListener('input', resetearBotonMarcas);
+checkPaginacion.addEventListener('change', resetearBotonMarcas);
+
 inputPdfMarcas.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
+    resetearBotonMarcas();
     infoPdfMarcas.textContent = "Cargando documento... ⏳";
     infoPdfMarcas.style.color = "var(--text-muted)";
 
     try {
-        // Guardamos los datos binarios en la variable global para poder reutilizarlos
         pdfParaMarcasOriginal = await file.arrayBuffer();
-
-        // Cargamos una copia rápida para saber cuántas hojas tiene
         const tempDoc = await PDFLib.PDFDocument.load(pdfParaMarcasOriginal);
         totalPaginasMarcas = tempDoc.getPageCount();
 
         infoPdfMarcas.textContent = `DOCUMENTO CARGADO: ${totalPaginasMarcas} PÁGINAS`;
         infoPdfMarcas.style.color = "var(--accent-green)";
 
-        // Habilitamos los controles
         inputMarcaAgua.disabled = false;
         inputMarcaAgua.style.borderColor = "var(--accent-green)";
         checkPaginacion.disabled = false;
@@ -479,9 +534,14 @@ inputPdfMarcas.addEventListener('change', async (e) => {
     }
 });
 
-// 2. Estampar la información
 btnAplicarMarcas.addEventListener('click', async () => {
     if (!pdfParaMarcasOriginal) return;
+
+    // PASO 2
+    if (pdfMarcasBlob) {
+        compartirOpcionalPwa(pdfMarcasBlob, nombrePdfMarcas);
+        return;
+    }
 
     const textoMarca = inputMarcaAgua.value.trim().toUpperCase();
     const numerar = checkPaginacion.checked;
@@ -491,28 +551,21 @@ btnAplicarMarcas.addEventListener('click', async () => {
         return;
     }
 
+    // PASO 1
     const textoOriginal = btnAplicarMarcas.innerText;
     btnAplicarMarcas.innerText = "ESTAMPANDO DOCUMENTO... ⏳";
     btnAplicarMarcas.disabled = true;
 
     try {
-        // Extraemos las herramientas de dibujo de pdf-lib
         const { PDFDocument, rgb, degrees, StandardFonts } = PDFLib;
-
-        // Cargamos el documento original
         const pdfDoc = await PDFDocument.load(pdfParaMarcasOriginal);
-
-        // Incrustamos la fuente Helvetica en negrita por defecto
         const helveticaFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-
         const paginas = pdfDoc.getPages();
         const total = paginas.length;
 
-        // Recorremos hoja por hoja para estampar los datos
         paginas.forEach((pagina, i) => {
             const { width, height } = pagina.getSize();
 
-            // A) PAGINACIÓN (Centrado en el pie de página)
             if (numerar) {
                 const textoPagina = `${i + 1} / ${total}`;
                 const fontSizePag = 11;
@@ -520,21 +573,18 @@ btnAplicarMarcas.addEventListener('click', async () => {
 
                 pagina.drawText(textoPagina, {
                     x: (width / 2) - (textWidth / 2),
-                                y: 25, // Margen de 25 píxeles desde abajo
+                                y: 25,
                                 size: fontSizePag,
                                 font: helveticaFont,
-                                color: rgb(0.3, 0.3, 0.3), // Gris oscuro para que quede profesional
+                                color: rgb(0.3, 0.3, 0.3),
                 });
             }
 
-            // B) MARCA DE AGUA (Diagonal y Transparente en el centro)
             if (textoMarca !== "") {
-                // Hacemos que la letra sea grande o pequeña dependiendo de cuánto texto haya puesto el usuario
                 const fontSizeMarca = Math.min(width / (textoMarca.length * 0.5), 100);
                 const textWidth = helveticaFont.widthOfTextAtSize(textoMarca, fontSizeMarca);
                 const textHeight = helveticaFont.heightAtSize(fontSizeMarca);
 
-                // Matemáticas para centrar el texto teniendo en cuenta que lo rotamos 45 grados
                 const radianes = Math.PI / 4;
                 const xPos = (width / 2) - (textWidth / 2) * Math.cos(radianes) + (textHeight / 2) * Math.sin(radianes);
                 const yPos = (height / 2) - (textWidth / 2) * Math.sin(radianes) - (textHeight / 2) * Math.cos(radianes);
@@ -544,26 +594,23 @@ btnAplicarMarcas.addEventListener('click', async () => {
                     y: yPos,
                     size: fontSizeMarca,
                     font: helveticaFont,
-                    color: rgb(0.85, 0.2, 0.2), // Rojo
-                                opacity: 0.15, // Muy transparente (15%) para que no tape el contenido real
+                    color: rgb(0.85, 0.2, 0.2),
+                                opacity: 0.15,
                                 rotate: degrees(45),
                 });
             }
         });
 
-        // 3. Guardar y Exportar
         const bytesPdfFinal = await pdfDoc.save();
-        const blobPdf = new Blob([bytesPdfFinal], { type: 'application/pdf' });
+        pdfMarcasBlob = new Blob([bytesPdfFinal], { type: 'application/pdf' });
+        nombrePdfMarcas = `documento_estampado_${Date.now()}.pdf`;
 
-        if (typeof descargarPwaSeguro === 'function') {
-            descargarPwaSeguro(blobPdf, `documento_estampado_${Date.now()}.pdf`);
-        }
-
-        btnAplicarMarcas.innerText = textoOriginal;
+        btnAplicarMarcas.innerText = "📤 ¡LISTO! TOCAR PARA COMPARTIR";
+        btnAplicarMarcas.style.backgroundColor = "var(--accent-green)";
+        btnAplicarMarcas.style.color = "#000";
         btnAplicarMarcas.disabled = false;
 
     } catch (error) {
-        console.error(error);
         alert("SISTEMA: Error al estampar el documento.");
         btnAplicarMarcas.innerText = textoOriginal;
         btnAplicarMarcas.disabled = false;
