@@ -18,6 +18,7 @@
    <nav class="nav-modulos">
         <button id="tabEscaner" class="tab-btn tab-activo">[01] ESCÁNER</button>
         <button id="tabPdf" class="tab-btn">[02] LAB. PDF</button>
+        <button id="tabDni" class="tab-btn">[03] DNI SEGURO</button>
     </nav>
 
     <section id="modulo-escaner" class="modulo-app">
@@ -146,6 +147,66 @@
 
     </section>
 
+    <section id="modulo-dni" class="modulo-app" style="display: none;">
+
+        <div class="top-controls">
+            <input type="file" id="inputImagenDni" accept="image/*">
+            <button id="btnRotarManualDni" style="display: none; min-width: 60px; padding: 10px;">↻ 90º</button>
+        </div>
+
+        <div class="visor-container">
+            <canvas id="lienzoDni"></canvas>
+        </div>
+
+        <div id="panelRecorteDni" class="panel-control" style="display: none; border-color: var(--danger);">
+            <p class="instruccion-tecnica" style="color: var(--danger);">// ALERTA: AUTO-ALINEACIÓN FALLIDA.</p>
+            <p class="instruccion-tecnica">Por favor, ajusta las 4 esquinas manualmente sobre el documento.</p>
+            <button id="btnRecortarDni" class="btn-primary" style="margin-top: 15px;">APLICAR RECORTE AL DNI</button>
+        </div>
+
+        <div id="panelEdicionDni" class="panel-control" style="display: none;">
+
+            <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: flex-end;">
+                <div class="parametro-control" style="flex: 1; margin-bottom: 0;">
+                    <label for="comboCaraDni">CARA DEL DOCUMENTO:</label>
+                    <select id="comboCaraDni" class="input-tecnico">
+                        <option value="anverso">ANVERSO (Frontal)</option>
+                        <option value="reverso">REVERSO (Trasera)</option>
+                    </select>
+                </div>
+                <button id="btnRotarDni" class="btn-secondary" style="flex: 0 0 auto; width: auto; min-width: 60px; margin: 0; height: 44px; padding: 0 10px;">↻ 90º</button>
+            </div>
+
+            <div style="display: flex; gap: 15px; margin-bottom: 25px; flex-wrap: wrap;">
+                <label class="toggle-tecnico" style="margin-bottom: 0;">
+                    <input type="checkbox" id="checkBnDni" checked>
+                    <span>B/N (Recomendado)</span>
+                </label>
+                <label class="toggle-tecnico" style="margin-bottom: 0;">
+                    <input type="checkbox" id="checkEscanerDni">
+                    <span>✨ Efecto Escáner</span>
+                </label>
+            </div>
+            <p class="instruccion-tecnica" style="border-bottom: 1px solid var(--border-bright); padding-bottom: 10px;">SELECCIONA QUÉ DATOS DESEAS CENSURAR:</p>
+
+            <div id="contenedorCensura" style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 25px;">
+                </div>
+
+            <p class="instruccion-tecnica" style="border-bottom: 1px solid var(--border-bright); padding-bottom: 10px;">MARCA DE AGUA DE SEGURIDAD:</p>
+
+            <div class="parametro-control">
+                <label for="inputMotivoDni">TEXTO PRINCIPAL (Puedes borrarlo si no lo quieres):</label>
+                <input type="text" id="inputMotivoDni" class="input-tecnico" value="COPIA PARA RESERVA HOTEL">
+            </div>
+            <div class="parametro-control">
+                <label for="inputFechaDni">FECHA (Opcional):</label>
+                <input type="text" id="inputFechaDni" class="input-tecnico" value="29/05/2026">
+            </div>
+
+            <button id="btnDescargarDni" class="btn-primary" style="margin-top: 10px;">EXPORTAR DNI SEGURO</button>
+        </div>
+    </section>
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script async src="https://docs.opencv.org/4.8.0/opencv.js" type="text/javascript"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
@@ -153,6 +214,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
     <script src="app.js"></script>
-    <script src="herramientas-pdf.js"></script> </body>
+    <script src="herramientas-pdf.js"></script>
+    <script src="dni-seguro.js"></script>
 </body>
 </html>
