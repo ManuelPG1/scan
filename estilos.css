@@ -72,7 +72,7 @@ h2 {
     box-shadow: 0 10px 30px rgba(0,0,0,0.8);
 }
 
-#lienzoApp {
+#lienzoApp, #lienzoDni{
 width: 100%;
 height: auto;
 max-height: 60vh;
