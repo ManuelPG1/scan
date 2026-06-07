@@ -1,13 +1,14 @@
-const CACHE_NAME = 'escaner-v4.1';
+const CACHE_NAME = 'escaner-v5';
 
 const ASSETS = [
   './',
 './index.html',
 './estilos.css',
 './app.js',
-'./manifest.json'
-'./icono-192.png'
-'./icono-512.png'
+'./manifest.json',
+'./icono-192.png',
+'./icono-512.png',
+'./dni-seguro.js',
 './herramientas-pdf.js',
 ];
 
