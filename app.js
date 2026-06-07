@@ -13,22 +13,22 @@ if ('serviceWorker' in navigator) {
 // --- SISTEMA DE NAVEGACIÓN (SPA) ---
 const tabEscaner = document.getElementById('tabEscaner');
 const tabPdf = document.getElementById('tabPdf');
+const tabDni = document.getElementById('tabDni');
 const moduloEscaner = document.getElementById('modulo-escaner');
 const moduloPdf = document.getElementById('modulo-pdf');
+const moduloDni = document.getElementById('modulo-dni');
 
-tabEscaner.addEventListener('click', () => {
-    tabEscaner.classList.add('tab-activo');
-    tabPdf.classList.remove('tab-activo');
-    moduloEscaner.style.display = 'block';
-    moduloPdf.style.display = 'none';
-});
+function cambiarTab(tabActivo, moduloActivo) {
+    [tabEscaner, tabPdf, tabDni].forEach(t => t.classList.remove('tab-activo'));
+    [moduloEscaner, moduloPdf, moduloDni].forEach(m => m.style.display = 'none');
 
-tabPdf.addEventListener('click', () => {
-    tabPdf.classList.add('tab-activo');
-    tabEscaner.classList.remove('tab-activo');
-    moduloPdf.style.display = 'block';
-    moduloEscaner.style.display = 'none';
-});
+    tabActivo.classList.add('tab-activo');
+    moduloActivo.style.display = 'block';
+}
+
+tabEscaner.addEventListener('click', () => cambiarTab(tabEscaner, moduloEscaner));
+tabPdf.addEventListener('click', () => cambiarTab(tabPdf, moduloPdf));
+tabDni.addEventListener('click', () => cambiarTab(tabDni, moduloDni));
 
 /////////////////7
 
