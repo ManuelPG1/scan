@@ -1,4 +1,4 @@
-const CACHE_NAME = 'escaner-v5';
+const CACHE_NAME = 'escaner-v5.1';
 
 const ASSETS = [
   './',
