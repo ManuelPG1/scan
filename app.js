@@ -598,7 +598,10 @@ btnGuardarPagina.addEventListener('click', () => {
 
             // Actualizamos la interfaz
             contadorPaginas.textContent = listaPaginas.length;
-            if (listaPaginas.length === 0) btnCompartirPDF.disabled = true;
+            if (listaPaginas.length === 0) {
+                btnCompartirPDF.disabled = true;
+                btnCompartirImagen.disabled = true;
+            }
         }
     });
 
@@ -622,6 +625,7 @@ btnGuardarPagina.addEventListener('click', () => {
     // Actualizamos interfaz general
     contadorPaginas.textContent = listaPaginas.length;
     btnCompartirPDF.disabled = false;
+    btnCompartirImagen.disabled = false;
     btnGuardarPagina.disabled = true; // Bloquear hasta el siguiente escaneo
 
     if (colaArchivos.length > 0) {
@@ -699,9 +703,12 @@ function descargarPwaSeguro(blob, nombreArchivo) {
 
 // 2. COMPARTIR IMAGEN
 btnCompartirImagen.addEventListener('click', async () => {
-    if (!imagenActualBase64) return;
+    if (listaPaginas.length === 0) return;
 
-    const blob = base64ToBlob(imagenActualBase64, 'image/jpeg');
+    // Cogemos siempre la última imagen que se ha añadido al lote
+    const ultimaImagenBase64 = listaPaginas[listaPaginas.length - 1].datos;
+
+    const blob = base64ToBlob(ultimaImagenBase64, 'image/jpeg');
     const nombreArchivo = `escaner_${Date.now()}.jpg`;
     const archivo = new File([blob], nombreArchivo, { type: 'image/jpeg' });
 
